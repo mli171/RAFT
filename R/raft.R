@@ -1,3 +1,97 @@
+#' Fit a rank-based AFT model
+#'
+#' Convenience wrapper that validates inputs, removes missing values, centers data,
+#' constructs the constraint matrices \code{Gamma} and \code{Lambda}, and then calls
+#' internal function \code{estimate.e.rank.aft()} to compute a rank-based
+#' accelerated failure time (AFT) estimator under right-censoring.
+#'
+#' The returned object is designed to be used directly by inference utilities such
+#' as \code{raft.score.test()} and \code{raft.wald()}.
+#'
+#' @param beta Optional numeric vector of initial values for the coefficient vector.
+#'   If \code{NULL}, initialized to a zero vector of length \code{ncol(x)}.
+#' @param y Numeric vector of observed outcomes (typically log-times in AFT settings).
+#' @param x Covariate matrix or vector. A data frame is coerced to a matrix. A vector
+#'   is treated as a single-column design matrix.
+#' @param delta Numeric/Integer vector of event indicators: \code{1} for uncensored
+#'   observations and \code{0} for right-censored observations.
+#' @param Gamma Optional matrix defining linear constraints/hypotheses of the form
+#'   \eqn{\Gamma \beta = b}. If provided, \code{Gamma} must have full row rank and
+#'   \code{b} must be supplied.
+#' @param b Optional numeric vector defining the right-hand side in \eqn{\Gamma \beta = b}.
+#'   Required if \code{Gamma} is provided.
+#' @param tol Numeric tolerance.
+#' @param half.width Numeric half-width.
+#' @param n.iter.max Integer maximum iterations.
+#' @param A Optional derivative weight function \eqn{A(u)} (see package weight functions).
+#' @param a1 Numeric constant used by some score families (passed through).
+#' @param m Optional numeric parameter for certain score families (passed through).
+#' @param n Optional numeric parameter for certain score families (passed through).
+#'
+#' @return
+#' A list containing the fitted coefficient estimate(s), constraint matrices, and
+#' the original data required for downstream inference (e.g., \code{raft.score.test()},
+#' \code{raft.wald()}). The list has the following components:
+#'
+#' \describe{
+#'   \item{beta}{Numeric vector of length \code{ncol(x)} giving the coefficient
+#'     estimate when there are no \code{Gamma} constraints (i.e., \code{n.gamma == 0}).
+#'     Otherwise \code{NULL}.}
+#'   \item{beta.r}{Numeric vector of length \code{ncol(x)} giving the coefficient
+#'     estimate under constraints (when \code{n.gamma > 0}), computed as
+#'     \eqn{\Gamma^{+} b + \Lambda^{+}\lambda}. If \code{n.lambda == 0} (fully
+#'     determined by constraints), this equals \eqn{\Gamma^{+} b}. Otherwise \code{NULL}
+#'     when \code{n.gamma == 0}.}
+#'   \item{n.gamma}{Integer. Number of rows of \code{Gamma} (0 if \code{Gamma} is \code{NULL}).}
+#'   \item{n.lambda}{Integer. Number of rows of \code{Lambda} (0 if \code{Lambda} is \code{NULL}).}
+#'   \item{Gamma}{Constraint matrix defining \eqn{\Gamma\beta=b}. \code{NULL} if no constraints are specified.}
+#'   \item{Lambda}{Complementary matrix spanning the null space of \eqn{\Gamma^\top}.
+#'     When \code{Gamma} is \code{NULL}, \code{Lambda} is the identity matrix of
+#'     dimension \code{ncol(x)}. May be \code{NULL} if \code{Gamma} has full row rank
+#'     equal to \code{ncol(x)}.}
+#'   \item{Gamma.ginv}{Generalized inverse of \code{Gamma} (via \code{MASS::ginv()}),
+#'     or \code{NULL} if \code{Gamma} is \code{NULL}.}
+#'   \item{Lambda.ginv}{Generalized inverse of \code{Lambda} (via \code{MASS::ginv()}),
+#'     or \code{NULL} if \code{Lambda} is \code{NULL}.}
+#'   \item{b}{Right-hand side vector in \eqn{\Gamma\beta=b}. \code{NULL} if \code{Gamma} is \code{NULL}.}
+#'   \item{y}{Numeric vector of observed outcomes used in fitting (after any deletions/centering performed by \code{raft()}).}
+#'   \item{x}{Design matrix used in fitting (after any deletions/centering performed by \code{raft()}).}
+#'   \item{delta}{Event indicator vector used in fitting (1 = uncensored, 0 = right-censored).}
+#'   \item{A}{Derivative weight function \eqn{A(u)} passed through from \code{raft()}.}
+#'   \item{a1}{Numeric constant passed through from \code{raft()}.}
+#'   \item{m}{Optional score/weight parameter passed through from \code{raft()}.}
+#'   \item{n}{Optional score/weight parameter passed through from \code{raft()}.}
+#' }
+#'
+#'
+#' @examples
+#' \dontrun{
+#' set.seed(1234)
+#'
+#' data = generate.aft(
+#'   n.data = 100,
+#'   beta   = c(0.5, 1),
+#'   sd.y   = 1,
+#'   mu.c   = 1.5,
+#'   sd.c   = 2,
+#'   alpha  = 0,
+#'   gamma  = 0,
+#'   F.inv  = Q.norm
+#' )
+#'
+#' raft.res.NW = raft(
+#'   x=data$x,
+#'   y=data$y,
+#'   delta=data$delta,
+#'   A=A.norm,
+#'   a1=a.norm(1, 0, n.data),
+#'   m=NULL,
+#'   n=n.data
+#' )
+#' }
+#'
+#' @seealso \code{\link{raft.score.test}}, \code{\link{raft.wald}}.
+#' @export
 raft = function(beta=NULL, y, x, delta, Gamma=NULL, b=NULL, tol=10^-12, half.width=0.5, n.iter.max=100,
                 A=NULL, a1=0, m=NULL, n=NULL){
   #

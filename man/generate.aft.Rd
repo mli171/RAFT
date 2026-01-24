@@ -12,7 +12,8 @@ generate.aft(
   sd.c = 2,
   alpha = 0,
   gamma = 0,
-  F.inv = Q.norm
+  F.inv = Q.norm,
+  seed = NULL
 )
 }
 \arguments{
@@ -38,6 +39,9 @@ generating the error term \eqn{\varepsilon_i}.}
 It must accept arguments \code{(u, sd.y)} where \code{u} is a numeric vector of
 uniforms in \eqn{(0,1)} and \code{sd.y} is a scale parameter. Default is
 \code{Q.norm} (assumed to be defined elsewhere in the package).}
+
+\item{seed}{Optional integer random seed for reproducible simulation.
+If \code{NULL}, the current RNG state is used.}
 }
 \value{
 A list with components:

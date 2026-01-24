@@ -29,6 +29,8 @@
 #'   It must accept arguments \code{(u, sd.y)} where \code{u} is a numeric vector of
 #'   uniforms in \eqn{(0,1)} and \code{sd.y} is a scale parameter. Default is
 #'   \code{Q.norm} (assumed to be defined elsewhere in the package).
+#' @param seed Optional integer random seed for reproducible simulation.
+#'   If \code{NULL}, the current RNG state is used.
 #'
 #' @return A list with components:
 #' \itemize{
@@ -67,7 +69,7 @@
 #' }
 #'
 #' @export
-generate.aft = function(n.data=100, beta=c(0,0), sd.y=1, mu.c=1.5, sd.c=2, alpha=0, gamma=0, F.inv=Q.norm) {
+generate.aft = function(n.data=100, beta=c(0,0), sd.y=1, mu.c=1.5, sd.c=2, alpha=0, gamma=0, F.inv=Q.norm, seed=NULL) {
 
   if (!is.null(seed)) set.seed(seed)
 
