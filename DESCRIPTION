@@ -5,7 +5,7 @@ Version: 0.1.0
 Authors@R: c(person("Glen A.", "Satten", email="gsatten@emory.edu", role=c("aut", "ctb", "cre", "cph")),
              person("Mo", "Li", email="mo.li@louisiana.edu", role=c("aut", "ctb", "cph")),
 	           person("Ni", "Zhao", role=c("aut", "ctb", "cph")),
-	           person("Robert", "Strawderman", role=c("aut", "ctb", "cph")))
+	           person("Robert", "Strawderman", role=c("aut", "ctb", "cph"))
   )
 Description: This R pacakge provides tools for R-estimation in linear models with right-censored outcomes, extending classical rank-based R-estimators to seetings where the response is subject to censoring. The goal is to enable robust, rank-based estimation of regression effects without relying on fully parametric assumptions for the error distribution, while properly accounting for censoring.
 Imports: expm, stats, MASS

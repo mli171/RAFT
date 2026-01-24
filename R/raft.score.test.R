@@ -52,6 +52,7 @@
 #' )
 #'
 #' scoretest.res = raft.score.test(est.rank.res = raft.res.NW)
+#' }
 #'
 #' @seealso \code{\link{raft}}, \code{\link{raft.wald}}.
 #'
