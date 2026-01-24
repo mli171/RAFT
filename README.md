@@ -92,13 +92,13 @@ raft.res.NW = raft(
 raft.res.NW
 ```
 
-### score test
+### Score test
 
 ```{r}
 scoretest.res = raft.score.test(est.rank.res = raft.res.NW)
 ```
 
-### wald test
+### Wald test
 
 ```{r}
 waldtest.res = raft.wald(est.raft.res = raft.res.NW)  
