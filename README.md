@@ -45,7 +45,7 @@ raft()
 
 ## An example of using the caft function
 
-Next, we apply 'raft' to the simulated dataset.
+Next, we apply **RAFT** to the simulated dataset.
 
 ### Generate right censored data with specified quantile function.
 
