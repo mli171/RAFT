@@ -9,7 +9,7 @@ Authors@R: c(person("Glen A.", "Satten", email="gsatten@emory.edu", role=c("aut"
   )
 Description: This R pacakge provides tools for R-estimation in linear models with right-censored outcomes, extending classical rank-based R-estimators to seetings where the response is subject to censoring. The goal is to enable robust, rank-based estimation of regression effects without relying on fully parametric assumptions for the error distribution, while properly accounting for censoring.
 Imports: expm, stats, MASS
-License: LGPL (>=2)
+License: Apache License 2.0
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Depends: R (>= 4.3.0)

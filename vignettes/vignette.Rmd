@@ -1,0 +1,118 @@
+---
+title: "A brief guide to RAFT"
+author: "Glen A Satten, Mo Li, Ni Zhao, Robert Strawderman"
+date: "`r format(Sys.time(), '%d %b %Y')`"
+output: 
+  rmarkdown::html_vignette:
+    number_sections: false
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{A brief guide to RAFT}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+```{r, include=FALSE}
+library(RAFT)
+```
+
+# Overview
+
+## Introduction
+
+???
+
+## Installation
+
+Install from the local file (the .tar.gz file), which you can download from https://github.com/mli171/RAFT.
+
+```{r, eval=FALSE}
+devtools::install_local("RAFT_1.0.tar.gz", dependencies = TRUE)
+```
+
+You can also install the developer version from github via the following code.
+
+```{r, eval=FALSE}
+remotes::install_github("mli171/RAFT", build_vignettes = TRUE, dependencies = TRUE)
+```
+
+## Open the Vignette in R
+
+```{r, eval=FALSE}
+browseVignettes("CAFT")
+```
+
+or
+
+```{r, eval=FALSE}
+vignette("vignette", package = "RAFT")
+```
+
+# RAFT: R-Estimation with Right-Censored Data
+
+The main functions in RAFT package are
+
+```{r, eval=FALSE}
+raft(beta = NULL, y, x, delta, Gamma = NULL, b = NULL, tol = 10^-12,
+     half.width = 0.5, n.iter.max = 100, A = NULL, a1 = 0, m = NULL, n = NULL)
+```
+
+```{r, eval=FALSE}
+raft.score.test(est.rank.res, var.type = "martingale")
+```
+
+```{r, eval=FALSE}
+raft.wald(est.raft.res, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, 
+          var.type = "martingale", Gamma = NULL, b = NULL)
+```
+
+
+## Example simulated data set illustration
+
+```{r}
+n.data  = 100
+beta.T  = c(0.5, 1)
+sd.y.T  = 1
+mu.c.T  = 1.5
+sd.c.T  = 2
+alpha.T = 0
+gamma.T = 0
+
+data = generate.aft(
+  n.data = n.data,
+  beta   = beta.T,
+  sd.y   = sd.y.T,
+  mu.c   = mu.c.T,
+  sd.c   = sd.c.T,
+  alpha  = alpha.T,
+  gamma  = gamma.T,
+  F.inv  = Q.norm,
+  seed   = 1234
+)
+
+# normal weights
+raft.res.NW = raft(
+  x=data$x,
+  y=data$y,
+  delta=data$delta,
+  A=A.norm,
+  a1=a.norm(1, 0, n.data),
+  m=NULL,
+  n=n.data
+)
+
+# score test
+scoretest.res = raft.score.test(est.rank.res = raft.res.NW)
+
+# wald test
+waldtest.res = raft.wald(est.raft.res = raft.res.NW)
+```
