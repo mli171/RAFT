@@ -2,19 +2,22 @@
 % Please edit documentation in R/raft.score.test.R
 \name{raft.score.test}
 \alias{raft.score.test}
-\title{Score test for rank-based AFT estimating equations under right-censoring}
+\title{Pseudo-Score test for the R-estimator for the Accelerated Failure Time model (RAFT) for right-censored data.}
 \usage{
 raft.score.test(est.rank.res, var.type = "martingale")
 }
 \arguments{
 \item{est.rank.res}{A list returned by \code{raft()}.}
 
-\item{var.type}{Character scalar specifying the variance estimator used for the
-score. One of:
+\item{var.type}{Character scalar specifying the variance estimator for the score function.
+One of:
 \itemize{
-\item \code{"martingale"} (default): ???
-\item \code{"conservative"}: ???
-\item \code{"difference"}: ???
+\item \code{"martingale"} (default): The best choice, calculates \eqn{\Sigma} as given in eqs (22) or (38)  of Satten et al.
+R-Estimation with Right-Censored Data, https://arxiv.org/pdf/2601.06685
+\item \code{"conservative"}: Conservative estimator \eqn{\Sigma_1} from Theorem 4 of Satten et al.R-Estimation with Right-Censored
+Data, https://arxiv.org/pdf/2601.06685.  Only use if \code{is.null(A)==TRUE} and \code{is.null(a)==TRUE}.
+\item \code{"difference"}: Difference-based estimator \eqn{\Sigma_1 - \Sigma_2} from Theorem 4 of Satten et al.R-Estimation with Right-Censored
+Data, https://arxiv.org/pdf/2601.06685.  Only use if \code{is.null(A)==TRUE} and \code{is.null(a)==TRUE}.
 }}
 }
 \value{
@@ -28,13 +31,11 @@ A list with components:
 }
 }
 \description{
-Computes a chi-square score test for hypotheses
-defined through linear constraints on the coefficient vector from a rank-based
-accelerated failure time (AFT) model with right-censored outcomes.
+Computes a chi-square score test for the null hypothesis \eqn{\Gamma \beta = b}.
 }
 \details{
-This function is intended to be called on the result object returned by
-\code{raft()} and uses the score vector and a sandwich-type covariance
+This function is intended to be called using the output from the parameter estimation module
+\code{raft()}.  and uses the score vector and a sandwich-type covariance
 estimate for the score to form a quadratic form test statistic.
 }
 \examples{

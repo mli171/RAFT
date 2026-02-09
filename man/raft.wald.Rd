@@ -11,56 +11,65 @@ raft.wald(
   tol = 10^-12,
   var.type = "martingale",
   Gamma = NULL,
-  b = NULL
+  b = NULL,
+  omega = NULL,
+  alpha = 0.05
 )
 }
 \arguments{
 \item{est.raft.res}{A list returned by \code{raft()}.}
 
-\item{half.width}{Numeric. Half-width parameter, typically controlling step
-size. Default is 0.5.}
+\item{half.width}{Numeric. Half-width of initial interval used by uniroot to find solutions of equations in Huang's method.
+Default is 0.5.}
 
-\item{n.iter.max}{Integer. Maximum iterations limit. Default is 1000.}
+\item{n.iter.max}{Integer. Maximum number of iterations to find solution to score equations. Default is 1000.}
 
-\item{tol}{Numeric tolerance. Default is 10e-12.}
+\item{tol}{Numeric tolerance for uniroot when solving equations in Huang's method. Default is 10e-12.}
 
-\item{var.type}{Character scalar specifying which score-variance estimator to use
+\item{var.type}{Character scalar specifying the variance estimator for the score function.
+One of:
 \itemize{
-\item \code{"martingale"} (default): ???
-\item \code{"conservative"}: ???
-\item \code{"difference"}: ???
+\item \code{"martingale"} (default): The best choice, calculates \eqn{\Sigma} as given in eq (22) or (38) of Satten et al.
+R-Estimation with Right-Censored Data, https://arxiv.org/pdf/2601.06685
+\item \code{"conservative"}: Conservative estimator \eqn{\Sigma_1} from Theorem 4 of Satten et al.R-Estimation with Right-Censored
+Data, https://arxiv.org/pdf/2601.06685.  Only use if \code{is.null(A)==TRUE} and \code{is.null(a)==TRUE}.
+\item \code{"difference"}: Difference-based estimator \eqn{\Sigma_1 - \Sigma_2} from Theorem 4 of Satten et al.R-Estimation with Right-Censored
+Data, https://arxiv.org/pdf/2601.06685.  Only use if \code{is.null(A)==TRUE} and \code{is.null(a)==TRUE}.
 }}
 
 \item{Gamma}{Optional matrix (or vector coerced to a 1-row matrix) specifying
-linear restrictions for the Wald test. If \code{NULL}, tests \eqn{H_0:\beta=0}.}
+the null hypothesis for the Wald test. If \code{NULL}, tests \eqn{H_0:\beta=0}.}
 
-\item{b}{Optional numeric vector specifying the right-hand side in \eqn{H_0:\Gamma\beta=b}.
-Only used when \code{Gamma} is provided. If \code{NULL}, \eqn{b} is treated as 0.}
+\item{b}{Optional numeric vector specifying the right-hand side of \eqn{H_0:\Gamma\beta=b}.
+Only used when \code{Gamma} is provided.}
+
+\item{omega}{Optional matrix to use in Wald test.  Supresses re-calculation of Omega if multiple tests with different Gamma matrices are needed.}
+
+\item{alpha}{significance level for (marginal) confidence intervals.}
 }
 \value{
 A list with components:
 \itemize{
 \item \code{omega}: estimated variance–covariance matrix \eqn{\widehat\Omega} of \eqn{\hat\beta}.
-\item \code{beta.var}: perturbation-based sensitivity matrix used to form \code{omega}.
 \item \code{test}: Wald chi-square test statistic.
-\item \code{p.value}: p-value from \code{pchisq(test, df, lower.tail = FALSE)}.
+\item \code{p.value}: p-value calculated using \code{pchisq(test, df, lower.tail = FALSE)}.
 \item \code{df}: degrees of freedom (\code{ncol(x)} if \code{Gamma} is \code{NULL}, else \code{nrow(Gamma)}).
+\item \code{marginal.ci}: asymptotic (marginal) confidence intervals for the parameters \eqn{\beta}.
 }
 }
 \description{
 Computes an estimated variance–covariance matrix for the RAFT coefficient
 estimator \eqn{\hat\beta} and forms a Wald chi-square test for either:
 \itemize{
-\item the global null \eqn{H_0: \beta = 0} (default), or
-\item linear restrictions \eqn{H_0: \Gamma \beta = b}.
+\item the simple null hypothesis \eqn{H_0: \beta = 0} (default), or
+\item the composite null hypothesis \eqn{H_0: \Gamma \beta = b}.
 }
 }
 \details{
 The variance–covariance estimate \eqn{\widehat\Omega} is obtained using a
-perturbation approach commonly attributed to Huang-type methods in the AFT
-estimating-equation literature: the score covariance is square-rooted and used
-to define small offsets to the estimating equation; the resulting changes in
-\eqn{\hat\beta} are used to approximate sensitivity and hence \eqn{\Omega}.
+small modification of the approach developed by Huang (Journal of the American
+Statistical Association, 97:457:318–327, 2002). See Satten et al. R-Estimation
+with Right-Censored Data, https://arxiv.org/pdf/2601.06685 for details.
 }
 \examples{
 \dontrun{

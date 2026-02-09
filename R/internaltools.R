@@ -24,7 +24,7 @@ estimate.e.rank.aft = function(y, x, delta, Gamma=NULL, Lambda=NULL, Gamma.ginv=
   #   parameter estimation
   #
   if( n.param==1 ) {
-    res=uniroot(f=fcn.e.score, interval=c(-5,5), extendInt='yes', tol=tol, y=y, delta=delta, x.cov=x, Gamma=Gamma,
+    res=uniroot(f=fcn.e.score, interval=c(par-half.width,par+half.width), extendInt='yes', tol=tol, y=y, delta=delta, x.cov=x, Gamma=Gamma,
                 Lambda=Lambda, Gamma.ginv=Gamma.ginv, Lambda.ginv=Lambda.ginv, b=b, n.gamma=n.gamma, n.lambda=n.lambda,
                 A=A, a1=a1, m=m, n=n, offset=offset )
     par=res$root

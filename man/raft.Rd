@@ -15,7 +15,7 @@ raft(
   half.width = 0.5,
   n.iter.max = 100,
   A = NULL,
-  a1 = 0,
+  a = 0,
   m = NULL,
   n = NULL
 )
@@ -47,7 +47,7 @@ Required if \code{Gamma} is provided.}
 
 \item{A}{Optional derivative weight function \eqn{A(u)} (see package weight functions).}
 
-\item{a1}{Numeric constant used by some score families (passed through).}
+\item{a}{Numeric constant used by some score families (passed through).}
 
 \item{m}{Optional numeric parameter for certain score families (passed through).}
 
@@ -83,7 +83,7 @@ or \code{NULL} if \code{Lambda} is \code{NULL}.}
 \item{x}{Design matrix used in fitting (after any deletions/centering performed by \code{raft()}).}
 \item{delta}{Event indicator vector used in fitting (1 = uncensored, 0 = right-censored).}
 \item{A}{Derivative weight function \eqn{A(u)} passed through from \code{raft()}.}
-\item{a1}{Numeric constant passed through from \code{raft()}.}
+\item{a}{Numeric constant passed through from \code{raft()}.}
 \item{m}{Optional score/weight parameter passed through from \code{raft()}.}
 \item{n}{Optional score/weight parameter passed through from \code{raft()}.}
 }
@@ -102,26 +102,17 @@ as \code{raft.score.test()} and \code{raft.wald()}.
 \dontrun{
 set.seed(1234)
 
-data = generate.aft(
-  n.data = 100,
-  beta   = c(0.5, 1),
-  sd.y   = 1,
-  mu.c   = 1.5,
-  sd.c   = 2,
-  alpha  = 0,
-  gamma  = 0,
-  F.inv  = Q.norm
-)
+library('KMsurv')
+data(larynx, package='KMsurv')
+time=larynx$time
+stage=larynx$stage
+age=larynx$age
+delta=larynx$delta
+x=model.matrix(~stage+age+0)[,2:5]
 
-raft.res.NW = raft(
-  x=data$x,
-  y=data$y,
-  delta=data$delta,
-  A=A.norm,
-  a1=a.norm(1, 0, n.data),
-  m=NULL,
-  n=n.data
-)
+raft.res=raft(
+  beta = NULL, y=time, x=x, delta=delta,
+  tol = 10^-12, half.width = 0.5, n.iter.max = 100)
 }
 
 }

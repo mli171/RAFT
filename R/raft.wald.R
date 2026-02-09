@@ -3,39 +3,44 @@
 #' Computes an estimated variance–covariance matrix for the RAFT coefficient
 #' estimator \eqn{\hat\beta} and forms a Wald chi-square test for either:
 #' \itemize{
-#'   \item the global null \eqn{H_0: \beta = 0} (default), or
-#'   \item linear restrictions \eqn{H_0: \Gamma \beta = b}.
+#'   \item the simple null hypothesis \eqn{H_0: \beta = 0} (default), or
+#'   \item the composite null hypothesis \eqn{H_0: \Gamma \beta = b}.
 #' }
 #'
 #' The variance–covariance estimate \eqn{\widehat\Omega} is obtained using a
-#' perturbation approach commonly attributed to Huang-type methods in the AFT
-#' estimating-equation literature: the score covariance is square-rooted and used
-#' to define small offsets to the estimating equation; the resulting changes in
-#' \eqn{\hat\beta} are used to approximate sensitivity and hence \eqn{\Omega}.
+#' small modification of the approach developed by Huang (Journal of the American
+#' Statistical Association, 97:457:318–327, 2002). See Satten et al. R-Estimation
+#' with Right-Censored Data, https://arxiv.org/pdf/2601.06685 for details.
 #'
 #' @param est.raft.res A list returned by \code{raft()}.
-#' @param half.width Numeric. Half-width parameter, typically controlling step
-#' size. Default is 0.5.
-#' @param n.iter.max Integer. Maximum iterations limit. Default is 1000.
-#' @param tol Numeric tolerance. Default is 10e-12.
-#' @param var.type Character scalar specifying which score-variance estimator to use
+#' @param half.width Numeric. Half-width of initial interval used by uniroot to find solutions of equations in Huang's method.
+#'  Default is 0.5.
+#' @param n.iter.max Integer. Maximum number of iterations to find solution to score equations. Default is 1000.
+#' @param tol Numeric tolerance for uniroot when solving equations in Huang's method. Default is 10e-12.
+#' @param var.type Character scalar specifying the variance estimator for the score function.
+#'   One of:
 #'   \itemize{
-#'     \item \code{"martingale"} (default): ???
-#'     \item \code{"conservative"}: ???
-#'     \item \code{"difference"}: ???
+#'     \item \code{"martingale"} (default): The best choice, calculates \eqn{\Sigma} as given in eq (22) or (38) of Satten et al.
+#'            R-Estimation with Right-Censored Data, https://arxiv.org/pdf/2601.06685
+#'     \item \code{"conservative"}: Conservative estimator \eqn{\Sigma_1} from Theorem 4 of Satten et al.R-Estimation with Right-Censored
+#'            Data, https://arxiv.org/pdf/2601.06685.  Only use if \code{is.null(A)==TRUE} and \code{is.null(a)==TRUE}.
+#'     \item \code{"difference"}: Difference-based estimator \eqn{\Sigma_1 - \Sigma_2} from Theorem 4 of Satten et al.R-Estimation with Right-Censored
+#'            Data, https://arxiv.org/pdf/2601.06685.  Only use if \code{is.null(A)==TRUE} and \code{is.null(a)==TRUE}.
 #'   }
 #' @param Gamma Optional matrix (or vector coerced to a 1-row matrix) specifying
-#'   linear restrictions for the Wald test. If \code{NULL}, tests \eqn{H_0:\beta=0}.
-#' @param b Optional numeric vector specifying the right-hand side in \eqn{H_0:\Gamma\beta=b}.
-#'   Only used when \code{Gamma} is provided. If \code{NULL}, \eqn{b} is treated as 0.
+#'   the null hypothesis for the Wald test. If \code{NULL}, tests \eqn{H_0:\beta=0}.
+#' @param b Optional numeric vector specifying the right-hand side of \eqn{H_0:\Gamma\beta=b}.
+#'   Only used when \code{Gamma} is provided.
+#' @param omega Optional matrix to use in Wald test.  Supresses re-calculation of Omega if multiple tests with different Gamma matrices are needed.
+#' @param alpha significance level for (marginal) confidence intervals.
 #'
 #' @return A list with components:
 #' \itemize{
 #'   \item \code{omega}: estimated variance–covariance matrix \eqn{\widehat\Omega} of \eqn{\hat\beta}.
-#'   \item \code{beta.var}: perturbation-based sensitivity matrix used to form \code{omega}.
 #'   \item \code{test}: Wald chi-square test statistic.
-#'   \item \code{p.value}: p-value from \code{pchisq(test, df, lower.tail = FALSE)}.
+#'   \item \code{p.value}: p-value calculated using \code{pchisq(test, df, lower.tail = FALSE)}.
 #'   \item \code{df}: degrees of freedom (\code{ncol(x)} if \code{Gamma} is \code{NULL}, else \code{nrow(Gamma)}).
+#'   \item \code{marginal.ci}: asymptotic (marginal) confidence intervals for the parameters \eqn{\beta}.
 #' }
 #'
 #' @examples
@@ -69,7 +74,7 @@
 #' @seealso \code{\link{raft}}, \code{\link{raft.score.test}}.
 #'
 #' @export
-raft.wald = function(est.raft.res, half.width=0.5, n.iter.max=1000, tol=10^-12, var.type='martingale', Gamma=NULL, b=NULL) {
+raft.wald = function(est.raft.res, half.width=0.5, n.iter.max=1000, tol=10^-12, var.type='martingale', Gamma=NULL, b=NULL, omega=NULL, alpha=0.05) {
 
   #
   #   implements the huang method for calculating Omega, the variance-covariance matrix of beta_hat
@@ -96,43 +101,46 @@ raft.wald = function(est.raft.res, half.width=0.5, n.iter.max=1000, tol=10^-12, 
   x.beta=colSums( beta*t(x) )
   resid=y-x.beta
 
-  var.res=calculate.score.var(resid=resid, delta=delta, x=x, A=A, a1=a1, m=m, n=n)
-  if (var.type=='martingale') v=var.res$Sigma
-  else if (var.type=='conservative') v=var.res$Sigma.1
-  else if (var.type=='difference') v=var.res$Sigma.1 - var.res$Sigma.2
-
-  v=v/n.data
-  C=expm::sqrtm(v)
+  if( is.null(omega) ) {
 
 
-  beta.var.pos=beta.var.neg=beta.var.min=beta.var=matrix(0,n.param,n.param)
+    var.res=calculate.score.var(resid=resid, delta=delta, x=x, A=A, a1=a1, m=m, n=n)
+    if (var.type=='martingale') v=var.res$Sigma
+    else if (var.type=='conservative') v=var.res$Sigma.1
+    else if (var.type=='difference') v=var.res$Sigma.1 - var.res$Sigma.2
 
-  for (k in 1:n.param) {
+    v=v/n.data
+    C=expm::sqrtm(v)
 
 
-    pos.res=try(estimate.e.rank.aft(y=y, x=x, delta=delta, Gamma=Gamma.est, Lambda=Lambda.est, Gamma.ginv=Gamma.ginv.est,
-                                    Lambda.ginv=Lambda.ginv.est, b=b.est, beta=beta, n.gamma=n.gamma.est, n.lambda=n.lambda.est,
-                                    tol=tol, half.width=half.width, n.iter.max=n.iter.max,
-                                    A=A, a1=a1, m=m, n=n, offset=C[,k]), TRUE)
-    neg.res=try(estimate.e.rank.aft(y=y, x=x, delta=delta, Gamma=Gamma.est, Lambda=Lambda.est, Gamma.ginv=Gamma.ginv.est,
-                                    Lambda.ginv=Lambda.ginv.est, b=b.est, beta=beta, n.gamma=n.gamma.est, n.lambda=n.lambda.est,
-                                    tol=tol, half.width=half.width, n.iter.max=n.iter.max,
-                                    A=A, a1=a1, m=m, n=n, offset=-C[,k]), TRUE)
-    use.pos=!( class(pos.res)=='try-error' )
-    use.neg=!( class(neg.res)=='try-error' )
-    if (use.neg&use.pos) beta.var[,k]=0.5*(pos.res$beta-neg.res$beta)
-    else if (use.neg&!use.pos) beta.var[,k]=beta-neg.res$beta
-    else if (!use.neg&use.pos) beta.var[,k]=pos.res$beta-beta
-    else stop('both negative and positive solutions failed')
+    beta.var.pos=beta.var.neg=beta.var.min=beta.var=matrix(0,n.param,n.param)
+
+    for (k in 1:n.param) {
+
+
+      pos.res=try(estimate.e.rank.aft(y=y, x=x, delta=delta, Gamma=Gamma.est, Lambda=Lambda.est, Gamma.ginv=Gamma.ginv.est,
+                                      Lambda.ginv=Lambda.ginv.est, b=b.est, beta=beta, n.gamma=n.gamma.est, n.lambda=n.lambda.est,
+                                      tol=tol, half.width=half.width, n.iter.max=n.iter.max,
+                                      A=A, a1=a1, m=m, n=n, offset=C[,k]), TRUE)
+      neg.res=try(estimate.e.rank.aft(y=y, x=x, delta=delta, Gamma=Gamma.est, Lambda=Lambda.est, Gamma.ginv=Gamma.ginv.est,
+                                      Lambda.ginv=Lambda.ginv.est, b=b.est, beta=beta, n.gamma=n.gamma.est, n.lambda=n.lambda.est,
+                                      tol=tol, half.width=half.width, n.iter.max=n.iter.max,
+                                      A=A, a1=a1, m=m, n=n, offset=-C[,k]), TRUE)
+      use.pos=!( class(pos.res)=='try-error' )
+      use.neg=!( class(neg.res)=='try-error' )
+      if (use.neg&use.pos) beta.var[,k]=0.5*(pos.res$beta-neg.res$beta)
+      else if (use.neg&!use.pos) beta.var[,k]=beta-neg.res$beta
+      else if (!use.neg&use.pos) beta.var[,k]=pos.res$beta-beta
+      else stop('both negative and positive solutions failed')
+    }
+    omega=beta.var %*% t(beta.var)*n.data  #
   }
-  omega=beta.var %*% t(beta.var)
-
   #
   #   calculate wald test
   #
 
   if (is.null(Gamma)) {
-    test=beta %*% solve(omega, beta)
+    test=beta %*% solve(omega, beta)*n.data       #
     df=n.param
     omega.z=omega
   }
@@ -141,10 +149,20 @@ raft.wald = function(est.raft.res, half.width=0.5, n.iter.max=1000, tol=10^-12, 
     z.gamma=Gamma %*% beta
     if (!is.null(b)) z.gamma=z.gamma-b
     omega.z=tcrossprod(Gamma %*% omega, Gamma)
-    test=z.gamma %*% solve(omega.z, z.gamma)
+    test=z.gamma %*% solve(omega.z, z.gamma)*n.data      #
     df=nrow(Gamma)
   }
   p.value=pchisq(test, df=df, lower.tail=FALSE)
-  res=list(omega=omega, beta.var=beta.var, test=test, p.value=p.value, df=df)
+  #
+  #   calculate marginal confidence intervals
+  #
+  marginal.ci=matrix(0, nrow=n.param,ncol=2)
+  z.alpha=qnorm(1-alpha/2, 0, 1)
+  for (i in 1:n.param) {
+      marginal.ci[i,1]=beta[i] - z.alpha*sqrt(omega[i,i]/n.data)
+      marginal.ci[i,2]=beta[i] + z.alpha*sqrt(omega[i,i]/n.data)
+	  }
+  colnames(marginal.ci) = c('lower','upper')
+  res=list(omega=omega, test=test, p.value=p.value, df=df, marginal.ci=marginal.ci)
   return(res)
 }

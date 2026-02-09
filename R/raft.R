@@ -24,7 +24,7 @@
 #' @param half.width Numeric half-width.
 #' @param n.iter.max Integer maximum iterations.
 #' @param A Optional derivative weight function \eqn{A(u)} (see package weight functions).
-#' @param a1 Numeric constant used by some score families (passed through).
+#' @param a Numeric constant used by some score families (passed through).
 #' @param m Optional numeric parameter for certain score families (passed through).
 #' @param n Optional numeric parameter for certain score families (passed through).
 #'
@@ -58,7 +58,7 @@
 #'   \item{x}{Design matrix used in fitting (after any deletions/centering performed by \code{raft()}).}
 #'   \item{delta}{Event indicator vector used in fitting (1 = uncensored, 0 = right-censored).}
 #'   \item{A}{Derivative weight function \eqn{A(u)} passed through from \code{raft()}.}
-#'   \item{a1}{Numeric constant passed through from \code{raft()}.}
+#'   \item{a}{Numeric constant passed through from \code{raft()}.}
 #'   \item{m}{Optional score/weight parameter passed through from \code{raft()}.}
 #'   \item{n}{Optional score/weight parameter passed through from \code{raft()}.}
 #' }
@@ -68,32 +68,23 @@
 #' \dontrun{
 #' set.seed(1234)
 #'
-#' data = generate.aft(
-#'   n.data = 100,
-#'   beta   = c(0.5, 1),
-#'   sd.y   = 1,
-#'   mu.c   = 1.5,
-#'   sd.c   = 2,
-#'   alpha  = 0,
-#'   gamma  = 0,
-#'   F.inv  = Q.norm
-#' )
+#' library('KMsurv')
+#' data(larynx, package='KMsurv')
+#' time=larynx$time
+#' stage=larynx$stage
+#' age=larynx$age
+#' delta=larynx$delta
+#' x=model.matrix(~stage+age+0)[,2:5]
 #'
-#' raft.res.NW = raft(
-#'   x=data$x,
-#'   y=data$y,
-#'   delta=data$delta,
-#'   A=A.norm,
-#'   a1=a.norm(1, 0, n.data),
-#'   m=NULL,
-#'   n=n.data
-#' )
+#' raft.res=raft(
+#'   beta = NULL, y=time, x=x, delta=delta,
+#'   tol = 10^-12, half.width = 0.5, n.iter.max = 100)
 #' }
 #'
 #' @seealso \code{\link{raft.score.test}}, \code{\link{raft.wald}}.
 #' @export
 raft = function(beta=NULL, y, x, delta, Gamma=NULL, b=NULL, tol=10^-12, half.width=0.5, n.iter.max=100,
-                A=NULL, a1=0, m=NULL, n=NULL){
+                A=NULL, a=0, m=NULL, n=NULL){
   #
   #  checks input for problems, sets up Gamma, Lambda etc. and then calls estimate.e.rank.aft() to estimate beta or beta_r.
   #  output is used as input for hypothesis testing modules
@@ -145,6 +136,6 @@ raft = function(beta=NULL, y, x, delta, Gamma=NULL, b=NULL, tol=10^-12, half.wid
   est.res=estimate.e.rank.aft(y=y, x=x, delta=delta, Gamma=Gamma, Lambda=Lambda, Gamma.ginv=Gamma.ginv,
                               Lambda.ginv=Lambda.ginv, b=b, beta=beta, n.gamma=n.gamma, n.lambda=n.lambda,
                               tol=tol, half.width=half.width, n.iter.max=n.iter.max,
-                              A=A, a1=a1, m=m, n=n, offset=NULL)
+                              A=A, a1=a, m=m, n=n, offset=NULL)
   return(est.res)
 }

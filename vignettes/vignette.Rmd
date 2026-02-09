@@ -6,11 +6,15 @@ output:
   rmarkdown::html_vignette:
     number_sections: false
     toc: true
+    includes:
+        in_header: mathjax-config.html
+bibliography: references.bib        
 vignette: >
   %\VignetteIndexEntry{A brief guide to RAFT}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
+
 
 ```{r include = FALSE}
 knitr::opts_chunk$set(
@@ -25,11 +29,160 @@ knitr::opts_chunk$set(
 library(RAFT)
 ```
 
+
 # Overview
 
 ## Introduction
+RAFT (*R*-estimation for the *A*ccelerated *F*ailure *T*ime model) is a software package that allows R-estimation (rank-based linear model) for the AFT with right-censored data.  For additional details on the method, consult @Satten2026.
 
-???
+RAFT can be used to estimate parameters, estimate the variance-covariance matrix of these parameters, and conduct pseudo-score tests for composite null hypotheses.  The underlying model is
+\begin{equation}
+y^*_i=  x_i^T  \beta + \epsilon_i 
+\label{eq:basic.model}
+\end{equation}
+
+where $x_i$ has length $P$. Let $X$ be the $N \times P$ matrix having $i^\text{th}$ row $x_i^T$.  Note that because inference is rank-based, $X$s must _not_ have a component corresponding to an intercept (i.e., for which all entries are the same).  We also assume that $X$ has full column rank, i.e. the variables are not linearly dependent.
+
+When data are censored, values of $y^*_i$ are missing for some observations, but are known to be larger than an observed censoring time $c_i$.  We let $\delta_i=I(y^*_i \ge c_i)$ and let $y_i=\text{min}(y^*_i,c_i)$.  The observed data are then the values of $y_i$, $\delta_i$ and $x_i$.  If data are measured on the scale of $y$ then (\ref{eq:basic.model}) describes a censored linear regression.  If $y$ represents the log of a failure time $t$, then (\ref{eq:basic.model}) is called the Accelerated Failure Time model.
+
+### Rank-Based Inference in the Linear Model for Uncensored Data
+
+The standard (unweighted) R-estimator for linear regression with uncensored data solves the equations
+\begin{equation}\label{eq:unweighted.r}
+\Psi(\beta)=\sum_{i=1}^N R_i(x_i - \overline{x})=0
+\end{equation}
+where $R_i$ is the rank of the $i^\text{th}$ residual $r_i:=y_i-x_{i} \beta$ and $\overline{x}$ is the column mean of $X$.  
+
+More generally, weighted R-estimators for uncensored data solve the equations
+\begin{equation}\label{eq:weighted.r.est}
+\Psi_a(\beta)=\sum_{i=1}^N a(R_i)(x_i - \overline{x})=0
+\end{equation}
+for some weight function $a(\cdot)$.  Weight functions are discussed in the section `Weight Functions' below.
+
+$\textbf{Comment}$: Ranks scale from 1:N but in this document we scale the ranks by N so they lie between 0 and 1.
+
+### Rank-Based Inference for the Linear Model with Censored Data
+
+When some observations are censored, ranks are not known for any of the observations.  RAFT replaces the unknown ranks by their expected values calculated using a non-parameteric estimator.  Heuristically, the rank of an observation is ($N$ times) the proportion of observations less than or equal to it.  This suggest that when some data is censored, the rank of an uncensored observation should be proportional to the estimated cumulative distribution function.  Thus, for uncensored observations, RAFT estimates the rank $R_i$ by
+\begin{equation}\label{r.hat.uncens}
+\widetilde{R}_i=\frac{\widehat{F}(r_i)+\widehat{F}(r_i-)}{2}:=F^*(r_i) 
+\end{equation}
+where $\widehat{F}(r)$ is the self-consistent estimator [@Strawderman2023] of the CDF of the residuals $r_i$.  
+
+For censored  observations, RAFT replaces $F^*(r_i)$ by its expected value conditional on having residual larger than $r_i$, given by
+\begin{equation}\label{r.cens}
+\widetilde{R}_i=\int_{r_i}^\infty F^*(r)\frac{ d\widehat{F}(r)}{\widehat{S}(r_i)}=\frac{1}{2}[1+\widehat{F}(r_i)]
+\end{equation}
+and then solves the score equations
+\begin{equation}\label{eq:score.r}
+\widetilde{\Psi}(\beta)=\sum_{i=1}^N \widetilde{R}_i (x_i-\overline{x})=0
+\end{equation}
+
+The situation for weighted inference is similar.  For uncensored observations, RAFT replaces $a(R_i)$ by 
+\begin{equation}\label{eq:r.tilde.a.uncens}
+a(F^*_a(r_i))=\frac{A(\widehat{F}(r_i))-A(\widehat{F}(r_i-))}{\widehat{F}(r_i)-\widehat{F}(r_i-)}
+\end{equation}
+which implicitly defines $F^*_a(r)$ satisfying $\widehat{F}(r_i-) \le F_a^*(r_i) \le \widehat{F}(r_i)$.  For censored observations, RAFT replaces $a(F^*_a(r))$ by its expected value conditional on having residual larger than $r_i$, given by
+\begin{equation}\label{eq:r.tilde.a.cens} 
+\int_{r_i}^\infty a(F^*_a(r_i)) \frac{ d\widehat{F}(r)}{\widehat{S}(r_i)}=\frac{A(1)-A(\widehat{F}(r_i))}{\widehat{S}(r_i)} 
+\end{equation}
+where 
+$$A(u)=\int_0^u a(p)dp$$
+Then, RAFT solves the score equations
+\begin{equation}\label{eq:score.a}
+\widetilde{\Psi}_a=\sum_{i=1}^N \widetilde{R}^{(a)}_i (x_i-\overline{x})=0
+\end{equation}
+where $\widetilde{R}^{(a)}_i$ is given by the right-hand side of equation (\ref{eq:r.tilde.a.uncens}) when $\delta_i=1$ or the right-hand side of equation (\ref{eq:r.tilde.a.cens}) when $\delta_i=0$.
+
+### Weight Functions
+
+If the distribution of $\epsilon_i$ in \ref{eq:basic.model} is known to have PDF $g(\cdot)$ and CDF $G(\cdot)$, then the optimal choice for $a(\cdot)$ is
+\begin{equation}\label{eq:optimal.a} a(u)=-\frac{g'(G^{-1}(u))}{g(G^{-1}(u))}
+\end{equation}
+with corresponding value for $A(u)$ given by
+$$A(u)=g(G^{-1}(0))-g(G^{-1}(u))$$
+RAFT currently includes four choices for $a$ corresponding to optimal transformations for the Normal, Weibull/Gumbel, Generalized $F$, and Cauchy distributions.  Alternatively, users can easily include their own functions.
+
+#### Normally-Distributed Errors
+
+For regression with Normally-distributed errors, the optimal choice is to use:
+\begin{align}\label{eq:normal.wt}
+   a(u) &=\Phi^{-1}\left( \frac{n*u+0.5}{n+1} \right) \\
+   A(u) &= -\frac{n+1}{n} \phi\left( \frac{n*u+0.5}{n+1} \right)
+\end{align}
+where $\Phi$ and $\phi$ are the CDF and PDF of the standard Normal distribution, respectively, and where we have shifted the argument $u$ to ensure $a(u,m,n) < \infty$ when $u=0$ or $u=1$.
+
+#### Weibull Failure Times/Gumbel-Distributed Errors
+
+For data where $y=log(t)$ and $t$ follows a Weibull distribution (so that $y$ follows a Gumbel distribution), the optimal choice is
+\begin{align}\label{eq:weib.wt}
+   a(u) &=-1 - \text{log}\left( 1-\frac{n*u}{n+1} \right) \\
+   A(u) &= \frac{n+1}{n}  \left(1- \frac{n*u}{n+1} \right) \text{log} \left(1- \frac{n*u}{n+1} \right)
+\end{align}
+where we have shifted the argument $u$ to ensure $a(u,m,n) < \infty$ when $u=1$. 
+
+#### Generalized F Weights
+
+A flexible family of transformations that is useful when the distribution is not known but some shape information can be inferred assumes that $G$ corresponds to the CDF of the log of a $F_{2m_1,2m_2}(\cdot)$ variate.  This choice corresponds to 
+\begin{align}\label{eq:f.wt}
+  a(u) &= \frac{m_1 m_2(F^{-1}_{2m_1,2m_2}(u)-1)}{m_2 + m_1 F^{-1}_{2m_1,2m_2}(u)} \\\\
+  A(u) &= - \frac{m^{m_1}_1 m^{m_2}_2}{B(m_1,m_2)} \frac{[F^{-1}_{2m_1,2m_2}(u)]^{m_1}}{[m_2+m_1F^{-1}_{2m_1,2m_2}(u)]^{m_1+m_2}}
+\end{align}  
+
+#### Cauchy Errors
+
+The transformations that correspond to a Cauchy error distribution with location parameter 0 are given by
+\begin{align}\label{eq:cauchy.wt}
+a(u) &= - \text{sin}^2 (\pi*u)  \\\\
+A(u) &= - \text{sin}(2 \pi u)
+\end{align}
+Note that $a(u)$ is not monotone; this weight function cannot be used with standard R-estimation methods even for uncensored data.  Thus, even users with uncensored data who want to analyze their data assuming a Cauchy error may find it advantageous to use RAFT. 
+
+
+
+
+
+## Inference with RAFT
+
+RAFT is designed to estimate the parameters $\beta$ and perform inference.  In particular, it can test hypotheses of the form
+\begin{equation}\label{eq:H0}
+H_0 : \Gamma \cdot \beta = b
+\end{equation}
+where $\Gamma$ is a $P \times K$ matrix with $P \le K$ and $b$ is a vector of length $P$. We assume without loss of generality that $\Gamma$ has full row rank, so that $P$ is the number of degrees of freedom of the null hypothesis.  If $P=K$ then the null is simple; otherwise, the null hypothesis is composite. 
+
+RAFT can conduct inference either by estimating the parameters $\beta$ and their asymptotic variance-covariance matrix $\Omega$, or by constructing a pseudo-score test for the hypothesis (\ref{eq:H0}). Note that although both Wald and pseudo-score tests are available, the pseudo-score tests are much more computationally efficient.
+
+There are three main functions in the RAFT package: raft, score.test and raft.wald.  The function raft is for parameter estimation.  The function raft.score.test performs a pseudo-score test using the output from raft, and the function raft.wald uses the output from raft to return the variance-covariance matrix of parameter estimates, as well as a Wald test of the hypothesis (\ref{eq:H0}).
+
+
+### Pseudo-Score Tests
+
+For pseudo-score tests, RAFT estimates the restricted estimators by solving the restricted estimating equations
+\begin{equation}
+\Lambda \widetilde{\Psi}(\Gamma^{-}b+\Lambda^{-}\lambda)=0
+\end{equation}
+where $\Lambda$ is a $(K-P) \times K$ matrix that satisfies $\Gamma \Lambda^T=0$ (i.e., has rows that are orthogonal to the rows of $\Gamma$), $\mathcal{M}^-$ is the Moore-Penrose generalized inverse of matrix $\mathcal{M}$ and $\lambda$ is a $K-P$-dimensional vector of parameters to be estimated.  The restricted parameter estimates are then given by $\widehat{\beta}_r=\Gamma^{-}b+\Lambda^{-}\widehat{\lambda}$.  For additional details, see @Satten2025.
+
+
+### Wald-based Inference
+
+Wald-based inference is conceptually easier but computationally more difficult.  @Satten2026 show that
+\begin{equation}\label{eq:asy.normal}
+\sqrt{N}(\widehat{\beta}-\beta) \sim N(0,\Omega)
+\end{equation}
+but estimating $\Omega$ requires solving equations like (\ref{eq:score.r}) or (\ref{eq:score.a}) $2P$ times.  However, once estimator $\widehat{\Omega}$ is available, tests of hypothesis (\ref{eq:H0}) can be carried out by comparing the value of
+\begin{equation}\label{eq:wald.test}
+N(\Gamma \widehat{\beta} - b)^T\widehat{\Omega}^{-1}(\Gamma \widehat{\beta} - b)
+\end{equation}
+to the quantiles of the $\chi^2_P$ distribution.  Similarly, asymptotic two-sided $100(1-\alpha)\%$ confidence intervals can be constructed using
+\begin{equation}\label{eq:marginal.ci}
+\widehat{\beta}_j \pm z_\alpha \frac{\widehat{\Omega}_{jj}}{\sqrt{N}}
+\end{equation}
+where $z_\alpha$ is the $100( 1-\alpha/2 ) \%$ quantile of the standard Normal distribution. The estimator of $\Omega$ used in RAFT is a small modification of that proposed by @Huang2002.  
+
+
+
+# Running RAFT
 
 ## Installation
 
@@ -48,7 +201,7 @@ remotes::install_github("mli171/RAFT", build_vignettes = TRUE, dependencies = TR
 ## Open the Vignette in R
 
 ```{r, eval=FALSE}
-browseVignettes("CAFT")
+browseVignettes("RAFT")
 ```
 
 or
@@ -57,62 +210,201 @@ or
 vignette("vignette", package = "RAFT")
 ```
 
-# RAFT: R-Estimation with Right-Censored Data
 
-The main functions in RAFT package are
+## Load Example Data:  Cancer of the Larynx Data from Klein and Moeschberger
+
+To illustrate use of RAFT, we use data on 90 persons having cancer of the larynx.  These data are described in Section 1.8 of Survival Analysis Techniques for Censored and Truncated data, and are available in the R package KMsurv.
+
+```{r, eval=TRUE}
+   library('KMsurv')
+   data(larynx, package='KMsurv')
+   time=larynx$time
+   stage=factor(larynx$stage)
+   age=larynx$age
+   delta=larynx$delta
+   x=model.matrix(~stage+age+0)[,2:5]
+```
+Note that we drop the first column of the model.matrix so that $x$ has full column rank.
+
+## Wald-Type Inference Based on Estimating $\beta$
+
+We first describe how to conduct inference using Wald tests and confidence intervals.  For Wald tests, we first perform *unrestricted* parameter estimation: 
+
+```{r, eval=TRUE}
+raft.res=raft(beta = NULL, y=time, x=x, delta=delta, Gamma = NULL, b = NULL, tol = 10^-12,
+     half.width = 0.5, n.iter.max = 100, A = NULL, a = NULL, m = NULL, n = NULL)
+```
+Note that for unrestricted parameter estimation, we keep Gamma at its default value (Gamma=NULL) even if there is a hypothesis of the form $\Gamma \cdot \beta = b$ that we wish to test.  Wald-based inference uses the *unrestricted* estimates.  
+
+If desired, we can specify a starting value for the iterative solution of the score equations by setting $\beta=\beta_0$.  For example, we may wish to use a starting value $\beta_0$ obtained from the Fygenson & Ritov approach.
+
+The value $\texttt{raft.res\$beta}$ has the parameter estimate(s).  
+```{r, eval=TRUE}
+raft.res$beta
+```
+To obtain its variance-covariance estimator we run the function $\mathtt{raft.wald}$ using $\mathtt{raft.res}$ as input.  If desired, values for the matrix Gamma and vector b can now be specified in the call to raft.wald; otherwise, leaving Gamma and b as NULL is equivalent to choosing Gamma=diag(K) and b=rep(0,K). For example, the following code will estimate $\Omega$ and test the null hypothesis that all parameters are 0 using the test statistic in equation (\ref{eq:wald.test}):
+
+```{r, eval=TRUE}
+wald.res=raft.wald(est.raft.res=raft.res, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, 
+          var.type = "martingale", Gamma = NULL, b = NULL, alpha=0.05)
+wald.res$test
+wald.res$p.value
+```
+$100(1-\alpha/2)\%$ marginal confidence intervals for the parameters calculated using equation (\ref{eq:marginal.ci}) are returned in 
+```{r, eval=TRUE}
+wald.res$marginal.ci
+```
+By default, $\alpha=0.05$ to produce 95% confidence intervals; change the parameter $\alpha$ in the call to $\texttt{raft.wald}$ for different significance values.
+
+The asymptotic variance-covariance matrix $\Omega$ of $\sqrt{N}(\widetilde{\beta}-\beta)$ is returned in 
+```{r,eval=TRUE}
+wald.res$omega
+```
+If we have more than one hypothesis we want to test, or want confidence intervals for multiple significance levels $\alpha$, there is no need to re-calcaculate $\Omega$.  If we specify the argument $\Omega$ when running $\texttt{raft.wald}$, then this value is used and $\Omega$ is not recalculated.  For example, if we now want to test if the stage 3 and stage 4 effects are equal, we can execute the following code:
+```{r, eval=TRUE}
+G=c(0,1,-1,0)
+b=0
+wald.res.2=raft.wald(est.raft.res=raft.res, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, 
+          var.type = "martingale", Gamma = G, b = b, omega=wald.res$omega)
+wald.res.2$test
+wald.res.2$p.value
+wald.res.2$df
+```
+## Pseudo-Score Tests
+
+RAFT can also construct a pseudo-score test of the hypothesis $\Gamma \beta = b$.  In this case, we require the *restricted* parameter estimates.  These can be obtained using the raft function, by specifying the values of Gamma and $b$.
+
+As an example, we consider testing for any effect of stage.  This corresponds to choosing $\Gamma=G, b=b$ where
+$$ G= \begin{pmatrix} 1 & 0 & -1 & 0 \\ 
+                      0 & 1 & -1 & 0 \end{pmatrix} $$
+and
+$$ b= \begin{pmatrix} 0 \\ 0 \end{pmatrix} $$
+```{r, eval=TRUE}
+G=matrix( c(1,0,-1,0,0,1,-1,0), byrow=TRUE, nrow=2)
+b=c(0,0)
+raft.res=raft(beta = NULL,y=time, x=x, delta=delta, Gamma = G, b = b, tol = 10^-12,
+     half.width = 0.5, n.iter.max = 100, A = NULL, a = NULL, m = NULL, n = NULL)
+raft.res$beta.r
+```
+Note that the three regression coefficients for stage are all equal in this restricted estimator.
+
+We can now calculate the pseudo-score test statistic by calling raft.score.test:
+```{r, eval=TRUE}
+raft.score.res=raft.score.test(raft.res)
+raft.score.res$test
+raft.score.res$p.value
+```
+Note that, unlike Wald-based inference that uses the unrestricted parameter estimates, a new restricted parameter estimate is needed every time the null hypothesis changes.
+
+# Weighted (or Transformed) R-Estimation
+
+RAFT can also perform weighted R-estimation by specifying a transformation function $a(\cdot)$ and its anti-derivative $A(\cdot)$.  RAFT currently includes four weight functions:  Normal, Weibull/Gumbel, Generalized F and Cauchy.  
+
+The implementation in RAFT of each of these weight functions has 3 arguments:  the value of $u$ and two additional arguments ($m$ and $n$) used to define the function.  
+
+## Normally-Distributed Errors
+
+Normal scores corresponding to equations (\ref{eq:normal.wt}) are implemented in RAFT as:
+```{r, eval=TRUE}
+A.norm=function(u,m,n) -(n+1)/n*dnorm( qnorm( (n*u+0.5)/(n+1), 0, 1), 0, 1)
+a.norm=function(u,m,n) qnorm( (n*u+0.5)/(n+1),0,1)
+```
+The argument $n$ should be set equal to the sample size;  the argument $m$ is not needed in this case and can be kept at the default value $\texttt{NULL}$.  
+
+To estimate parameters using Normal weights, we would run
+```{r, eval=TRUE}
+n.data = length(time)
+raft.res.Norm = raft(y=time, x=x, delta=delta, A=A.norm, a=a.norm(1,0,n.data), m=NULL, n=n.data)
+raft.res.Norm$beta
+raft.res$beta.r
+```
+Note that the estimated parameters are similar for the unweighted and Normal weight analyses.
+
+Similarly, calling $\texttt{raft.wald}$ using $\texttt{raft.res.Norm}$ as input results in all aspects of inference being calculated assuming Normal weights. Although the estimated parameter values are similar with and without weights, $\Omega$ and test statistics may have larger differences:
+```{r, eval=FALSE}
+wald.raft.Norm=raft.wald(est.raft.res=raft.res.Norm, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, var.type = "martingale", Gamma = G, b = b)
+wald.raft.Norm$test
+wald.raft.Norm$p.value
+wald.raft.Norm$omega
+wald.raft.Norm$marginal.ci
+wald.raft$test
+wald.raft$p.value
+wald.raft$omega
+wald.raft$marginal.ci
+```
+
+
+## Weibull Failure Times/Gumbel-Distributed Errors
+
+Weibull/Gumbel scores corresponding to equations (\ref{eq:weib.wt}) are implemented in RAFT as:
+```{r, eval=FALSE}
+A.weib=function(u,m,n) (n+1)/n*( 1 - n*u/(n+1) )*log(1 - n*u/(n+1) )
+a.weib=function(u,m,n) -1 - \text{log}(1 - n*u/(n+1) )
+```
+As with Normal errors, $n$ should be set equal to the sample size while $m$ is not specified.  
 
 ```{r, eval=FALSE}
-raft(beta = NULL, y, x, delta, Gamma = NULL, b = NULL, tol = 10^-12,
-     half.width = 0.5, n.iter.max = 100, A = NULL, a1 = 0, m = NULL, n = NULL)
+raft.res.Weib = raft(y=time, x=x, delta=delta, A=A.weib, a=a.weib, m=NULL, n=n.data)
+raft.res.Weib$beta
+raft.res$beta
 ```
-
+Inference obtained using Weibull/Gumbel weights can now be obtained using $\texttt{raft.wald}$ as input to $\texttt{raft.wald}$:
 ```{r, eval=FALSE}
-raft.score.test(est.rank.res, var.type = "martingale")
+wald.raft.Weib=wald.raft(est.raft.res=raft.res.Weib, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, var.type = "martingale", Gamma = NULL, b = NULL, omega=NULL, alpha=0.05)
+wald.raft.Weib$test
+wald.raft.Weib$p.value
+wald.raft.Weib$omega
+wald.raft.Weib$marginal.ci
+wald.raft$test
+wald.raft$p.value
+wald.raft$omega
+wald.raft$marginal.ci
 ```
 
+
+## Generalized F Weights
+
+The generalized F family is implemented in RAFT as
 ```{r, eval=FALSE}
-raft.wald(est.raft.res, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, 
-          var.type = "martingale", Gamma = NULL, b = NULL)
+A.F=function(u,m,n) {
+    F.inv=ifelse(u==1,0,qf(u,2*m,2*n))
+    A=ifelse(u==1,0, -m^m*n^n*(F.inv)^m/(beta(m,n)*(n+m*F.inv)^(m+n)))
+	return(A)
+    }
+a.F=function(u,m,n) {
+    F.inv=ifelse(u==1,0,qf(u,2*m,2*n))
+    a=ifelse(u==1,n,m*n*(F.inv-1)/(n+m*F.inv))
+	return(a)
+    }	
 ```
+When using these transformations, $m$ should be set to $m_1$ and $n$ to $m_2$.
+
+## Cauchy Errors
+
+Cauchy weights are implemented in RAFT by:
+```{r, eval=FALSE}
+A.Cauchy=function(u,m,n) -(sin(pi*u))^2	 
+a.Cauchy=function(u,m,n) -(sin(2*pi*u))     
+```	
+Note that a.Cauchy$(\cdot)$ is not monotone; this weight function cannot be used with standard R-estimation methods even for uncensored data.  Thus, even users with uncensored data who want to analyze their data assuming a Cauchy error may find it advantageous to use RAFT. 
+
+We can re-analyze the age-only model using the Cauchy weight function:
+```{r, eval=FALSE}
+raft.res.CW=raft(y=time, x=x, delta=delta, A=A.Cauchy, a=a.Cauchy, m=NULL, n=NULL)
+raft.res.CW$beta
+raft.res$beta
+wald.res.CW=raft.wald(raft.res.CW)
+wald.raft.CW$test
+wald.raft.CW$p.value
+wald.raft.CW$omega
+wald.raft.CW$marginal.ci
+wald.raft$test
+wald.raft$p.value
+wald.raft$omega
+wald.raft$marginal.ci
+
+```	
+Users who wish to write their own weight functions should note that $A(u,m,n)$ must be able to return a vector of values when the input $u$ is a vector.
 
 
-## Example simulated data set illustration
-
-```{r}
-n.data  = 100
-beta.T  = c(0.5, 1)
-sd.y.T  = 1
-mu.c.T  = 1.5
-sd.c.T  = 2
-alpha.T = 0
-gamma.T = 0
-
-data = generate.aft(
-  n.data = n.data,
-  beta   = beta.T,
-  sd.y   = sd.y.T,
-  mu.c   = mu.c.T,
-  sd.c   = sd.c.T,
-  alpha  = alpha.T,
-  gamma  = gamma.T,
-  F.inv  = Q.norm,
-  seed   = 1234
-)
-
-# normal weights
-raft.res.NW = raft(
-  x=data$x,
-  y=data$y,
-  delta=data$delta,
-  A=A.norm,
-  a1=a.norm(1, 0, n.data),
-  m=NULL,
-  n=n.data
-)
-
-# score test
-scoretest.res = raft.score.test(est.rank.res = raft.res.NW)
-
-# wald test
-waldtest.res = raft.wald(est.raft.res = raft.res.NW)
-```
+# References
