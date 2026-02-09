@@ -16,6 +16,7 @@ Depends: R (>= 4.3.0)
 URL: https://github.com/mli171/RAFT
 BugReports: https://github.com/mli171/RAFT/issues
 Suggests: 
+    KMsurv,
     knitr,
     rmarkdown,
     mia,
