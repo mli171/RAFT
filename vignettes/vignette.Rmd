@@ -25,7 +25,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r, include=FALSE}
+```{r, include=TRUE}
 library(RAFT)
 ```
 
