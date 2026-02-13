@@ -7,20 +7,6 @@ Authors: Glen Satten (GSatten@emory.edu), Mo Li (mo.li@louisiana.edu), Ni Zhao (
 ## Overview
 This R package provides tools for R-estimation in linear models with right-censored outcomes, extending classical rank-based R-estimators to seetings where the response is subject to censoring. The goal is to enable robust, rank-based estimation of regression effects without relying on fully parametric assumptions for the error distribution, while properly accounting for censoring.
 
-### Key algorithmic components
-
-- a
-- b
-- c
-- d
-
-### Intended use cases
-
-- Regression modeling when outcomes are right-censored (e.g., time-to-event endpoints)
-- Robust estimation under departures from normal errors
-- Analyses where rank-based methods are preferred for stability or interpretability
-- Method development and reproducible research aligned with estimating-equation theory
-
 ## Package download and installation
 You can install the version of RAFT from Github:
 
