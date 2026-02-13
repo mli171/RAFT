@@ -149,7 +149,7 @@ raft.wald = function(est.raft.res, half.width=0.5, n.iter.max=1000, tol=10^-12, 
     z.gamma=Gamma %*% beta
     if (!is.null(b)) z.gamma=z.gamma-b
     omega.z=tcrossprod(Gamma %*% omega, Gamma)
-    test=z.gamma %*% solve(omega.z, z.gamma)*n.data      #
+    test=t(z.gamma) %*% solve(omega.z, z.gamma)*n.data      #
     df=nrow(Gamma)
   }
   p.value=pchisq(test, df=df, lower.tail=FALSE)

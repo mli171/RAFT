@@ -282,15 +282,15 @@ $$ b= \begin{pmatrix} 0 \\ 0 \end{pmatrix} $$
 ```{r, eval=TRUE}
 G=matrix( c(1,0,-1,0,0,1,-1,0), byrow=TRUE, nrow=2)
 b=c(0,0)
-raft.res=raft(beta = NULL,y=time, x=x, delta=delta, Gamma = G, b = b, tol = 10^-12,
+raft.res.r=raft(beta = NULL,y=time, x=x, delta=delta, Gamma = G, b = b, tol = 10^-12,
      half.width = 0.5, n.iter.max = 100, A = NULL, a = NULL, m = NULL, n = NULL)
-raft.res$beta.r
+raft.res.r$beta.r
 ```
 Note that the three regression coefficients for stage are all equal in this restricted estimator.
 
 We can now calculate the pseudo-score test statistic by calling raft.score.test:
 ```{r, eval=TRUE}
-raft.score.res=raft.score.test(raft.res)
+raft.score.res=raft.score.test(raft.res.r)
 raft.score.res$test
 raft.score.res$p.value
 ```
@@ -314,58 +314,57 @@ The argument $n$ should be set equal to the sample size;  the argument $m$ is no
 To estimate parameters using Normal weights, we would run
 ```{r, eval=TRUE}
 n.data = length(time)
-raft.res.Norm = raft(y=time, x=x, delta=delta, A=A.norm, a=a.norm(1,0,n.data), m=NULL, n=n.data)
+raft.res.Norm = raft(y=time, x=x, delta=delta, A=A.norm, a=a.norm, m=NULL, n=n.data)
 raft.res.Norm$beta
-raft.res$beta.r
+raft.res$beta
 ```
 Note that the estimated parameters are similar for the unweighted and Normal weight analyses.
 
 Similarly, calling $\texttt{raft.wald}$ using $\texttt{raft.res.Norm}$ as input results in all aspects of inference being calculated assuming Normal weights. Although the estimated parameter values are similar with and without weights, $\Omega$ and test statistics may have larger differences:
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 wald.raft.Norm=raft.wald(est.raft.res=raft.res.Norm, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, var.type = "martingale", Gamma = G, b = b)
 wald.raft.Norm$test
 wald.raft.Norm$p.value
 wald.raft.Norm$omega
 wald.raft.Norm$marginal.ci
-wald.raft$test
-wald.raft$p.value
-wald.raft$omega
-wald.raft$marginal.ci
+wald.res$test
+wald.res$p.value
+wald.res$omega
+wald.res$marginal.ci
 ```
 
 
 ## Weibull Failure Times/Gumbel-Distributed Errors
 
 Weibull/Gumbel scores corresponding to equations (\ref{eq:weib.wt}) are implemented in RAFT as:
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 A.weib=function(u,m,n) (n+1)/n*( 1 - n*u/(n+1) )*log(1 - n*u/(n+1) )
-a.weib=function(u,m,n) -1 - \text{log}(1 - n*u/(n+1) )
+a.weib=function(u,m,n) -1 - log(1 - n*u/(n+1) )
 ```
 As with Normal errors, $n$ should be set equal to the sample size while $m$ is not specified.  
 
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 raft.res.Weib = raft(y=time, x=x, delta=delta, A=A.weib, a=a.weib, m=NULL, n=n.data)
 raft.res.Weib$beta
-raft.res$beta
 ```
 Inference obtained using Weibull/Gumbel weights can now be obtained using $\texttt{raft.wald}$ as input to $\texttt{raft.wald}$:
-```{r, eval=FALSE}
-wald.raft.Weib=wald.raft(est.raft.res=raft.res.Weib, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, var.type = "martingale", Gamma = NULL, b = NULL, omega=NULL, alpha=0.05)
+```{r, eval=TRUE}
+wald.raft.Weib=raft.wald(est.raft.res=raft.res.Weib, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, var.type = "martingale", Gamma = NULL, b = NULL, omega=NULL, alpha=0.05)
 wald.raft.Weib$test
 wald.raft.Weib$p.value
 wald.raft.Weib$omega
 wald.raft.Weib$marginal.ci
-wald.raft$test
-wald.raft$p.value
-wald.raft$omega
-wald.raft$marginal.ci
+wald.res$test
+wald.res$p.value
+wald.res$omega
+wald.res$marginal.ci
 ```
 
 
 ## Generalized F Weights
 
 The generalized F family is implemented in RAFT as
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 A.F=function(u,m,n) {
     F.inv=ifelse(u==1,0,qf(u,2*m,2*n))
     A=ifelse(u==1,0, -m^m*n^n*(F.inv)^m/(beta(m,n)*(n+m*F.inv)^(m+n)))
@@ -382,26 +381,26 @@ When using these transformations, $m$ should be set to $m_1$ and $n$ to $m_2$.
 ## Cauchy Errors
 
 Cauchy weights are implemented in RAFT by:
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 A.Cauchy=function(u,m,n) -(sin(pi*u))^2	 
 a.Cauchy=function(u,m,n) -(sin(2*pi*u))     
 ```	
 Note that a.Cauchy$(\cdot)$ is not monotone; this weight function cannot be used with standard R-estimation methods even for uncensored data.  Thus, even users with uncensored data who want to analyze their data assuming a Cauchy error may find it advantageous to use RAFT. 
 
 We can re-analyze the age-only model using the Cauchy weight function:
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 raft.res.CW=raft(y=time, x=x, delta=delta, A=A.Cauchy, a=a.Cauchy, m=NULL, n=NULL)
 raft.res.CW$beta
 raft.res$beta
 wald.res.CW=raft.wald(raft.res.CW)
-wald.raft.CW$test
-wald.raft.CW$p.value
-wald.raft.CW$omega
-wald.raft.CW$marginal.ci
-wald.raft$test
-wald.raft$p.value
-wald.raft$omega
-wald.raft$marginal.ci
+wald.res.CW$test
+wald.res.CW$p.value
+wald.res.CW$omega
+wald.res.CW$marginal.ci
+wald.res$test
+wald.res$p.value
+wald.res$omega
+wald.res$marginal.ci
 
 ```	
 Users who wish to write their own weight functions should note that $A(u,m,n)$ must be able to return a vector of values when the input $u$ is a vector.
