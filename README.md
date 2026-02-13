@@ -29,65 +29,25 @@ The main function in RAFT package is:
 raft()
 ```
 
-## An example of using the caft function
 
-Next, we apply **RAFT** to the simulated dataset.
-
-### Generate right censored data with specified quantile function.
-
-Here, we use normal quantile function as an example. User can change to others, i.e, Weibull, Cauchy, etc. Quantile function examples can be found in QuantileError.R script.
+## Parameter estimation
 
 ```{r}
-n.data  = 100
-beta.T  = c(0.5, 1)
-sd.y.T  = 1
-mu.c.T  = 1.5
-sd.c.T  = 2
-alpha.T = 0
-gamma.T = 0
-
-# normal errors
-Q.norm=function(u, sd.y) qnorm(u,0,sd.y)
-
-set.seed(1234)
-
-data = generate.aft(
-  n.data = n.data,
-  beta   = beta.T,
-  sd.y   = sd.y.T,
-  mu.c   = mu.c.T,
-  sd.c   = sd.c.T,
-  alpha  = alpha.T,
-  gamma  = gamma.T,
-  F.inv  = Q.norm
-)
+raft.res = raft(beta = NULL, y=time, x=x, delta=delta, Gamma = NULL, b = NULL, 
+                tol = 10^-12, half.width = 0.5, n.iter.max = 100, A = NULL, 
+                a = NULL, m = NULL, n = NULL)
 ```
 
-### Apply our RAFT approach for parameter estimation
+## Score test
 
 ```{r}
-raft.res.NW = raft(
-  x=data$x, 
-  y=data$y, 
-  delta=data$delta, 
-  A=A.norm, 
-  a1=a.norm(1, 0, n.data), 
-  m=NULL, 
-  n=n.data
-)
-raft.res.NW
+raft.score.res = raft.score.test(est.rank.res = raft.res)
 ```
 
-### Score test
+## Wald test
 
 ```{r}
-scoretest.res = raft.score.test(est.rank.res = raft.res.NW)
-```
-
-### Wald test
-
-```{r}
-waldtest.res = raft.wald(est.raft.res = raft.res.NW)  
+raft.res.Weib = raft.wald(est.raft.res = raft.res)  
 ```
 
 ## References
