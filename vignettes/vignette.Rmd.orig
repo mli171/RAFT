@@ -1,7 +1,7 @@
 ---
 title: "A brief guide to RAFT"
 author: "Glen A Satten, Mo Li, Ni Zhao, Robert Strawderman"
-date: "20 Feb 2026"
+date: "`r format(Sys.time(), '%d %b %Y')`"
 output: 
   rmarkdown::html_vignette:
     number_sections: false
@@ -16,10 +16,16 @@ vignette: >
 ---
 
 
+```{r include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  warning = FALSE,
+  message = FALSE
+)
+```
 
-
-
-``` r
+```{r, include=TRUE}
 library(RAFT)
 ```
 
@@ -182,29 +188,25 @@ where $z_\alpha$ is the $100( 1-\alpha/2 ) \%$ quantile of the standard Normal d
 
 Install from the local file (the .tar.gz file), which you can download from https://github.com/mli171/RAFT.
 
-
-``` r
+```{r, eval=FALSE}
 devtools::install_local("RAFT_1.0.tar.gz", dependencies = TRUE)
 ```
 
 You can also install the developer version from github via the following code.
 
-
-``` r
+```{r, eval=FALSE}
 remotes::install_github("mli171/RAFT", build_vignettes = TRUE, dependencies = TRUE)
 ```
 
 ## Open the Vignette in R
 
-
-``` r
+```{r, eval=FALSE}
 browseVignettes("RAFT")
 ```
 
 or
 
-
-``` r
+```{r, eval=FALSE}
 vignette("vignette", package = "RAFT")
 ```
 
@@ -213,8 +215,7 @@ vignette("vignette", package = "RAFT")
 
 To illustrate use of RAFT, we use data on 90 persons having cancer of the larynx.  These data are described in Section 1.8 of Survival Analysis Techniques for Censored and Truncated data, and are available in the R package KMsurv.
 
-
-``` r
+```{r, eval=TRUE}
    library('KMsurv')
    data(larynx, package='KMsurv')
    time=larynx$time
@@ -229,8 +230,7 @@ Note that we drop the first column of the model.matrix so that $x$ has full colu
 
 We first describe how to conduct inference using Wald tests and confidence intervals.  For Wald tests, we first perform *unrestricted* parameter estimation: 
 
-
-``` r
+```{r, eval=TRUE}
 raft.res=raft(beta = NULL, y=time, x=x, delta=delta, Gamma = NULL, b = NULL, tol = 10^-12,
      half.width = 0.5, n.iter.max = 100, A = NULL, a = NULL, m = NULL, n = NULL)
 ```
@@ -239,61 +239,36 @@ Note that for unrestricted parameter estimation, we keep Gamma at its default va
 If desired, we can specify a starting value for the iterative solution of the score equations by setting $\beta=\beta_0$.  For example, we may wish to use a starting value $\beta_0$ obtained from the Fygenson & Ritov approach.
 
 The value $\texttt{raft.res\$beta}$ has the parameter estimate(s).  
-
-``` r
+```{r, eval=TRUE}
 raft.res$beta
-#> [1] -0.35948600 -2.46901688 -4.72136247 -0.03651029
 ```
 To obtain its variance-covariance estimator we run the function $\mathtt{raft.wald}$ using $\mathtt{raft.res}$ as input.  If desired, values for the matrix Gamma and vector b can now be specified in the call to raft.wald; otherwise, leaving Gamma and b as NULL is equivalent to choosing Gamma=diag(K) and b=rep(0,K). For example, the following code will estimate $\Omega$ and test the null hypothesis that all parameters are 0 using the test statistic in equation (\ref{eq:wald.test}):
 
-
-``` r
+```{r, eval=TRUE}
 wald.res=raft.wald(est.raft.res=raft.res, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, 
           var.type = "martingale", Gamma = NULL, b = NULL, alpha=0.05)
 wald.res$test
-#>          [,1]
-#> [1,] 16.03942
 wald.res$p.value
-#>             [,1]
-#> [1,] 0.002966722
 ```
 $100(1-\alpha/2)\%$ marginal confidence intervals for the parameters calculated using equation (\ref{eq:marginal.ci}) are returned in 
-
-``` r
+```{r, eval=TRUE}
 wald.res$marginal.ci
-#>           lower       upper
-#> [1,] -2.9778170  2.25884497
-#> [2,] -4.6936307 -0.24440305
-#> [3,] -7.3957468 -2.04697818
-#> [4,] -0.1178247  0.04480408
 ```
 By default, $\alpha=0.05$ to produce 95% confidence intervals; change the parameter $\alpha$ in the call to $\texttt{raft.wald}$ for different significance values.
 
 The asymptotic variance-covariance matrix $\Omega$ of $\sqrt{N}(\widetilde{\beta}-\beta)$ is returned in 
-
-``` r
+```{r,eval=TRUE}
 wald.res$omega
-#>             [,1]        [,2]        [,3]       [,4]
-#> [1,] 160.6184432  57.2430884  53.4846073 -0.8988188
-#> [2,]  57.2430884 115.9459525  36.9240374 -0.3930864
-#> [3,]  53.4846073  36.9240374 167.5691063  0.5631962
-#> [4,]  -0.8988188  -0.3930864   0.5631962  0.1549105
 ```
 If we have more than one hypothesis we want to test, or want confidence intervals for multiple significance levels $\alpha$, there is no need to re-calcaculate $\Omega$.  If we specify the argument $\Omega$ when running $\texttt{raft.wald}$, then this value is used and $\Omega$ is not recalculated.  For example, if we now want to test if the stage 3 and stage 4 effects are equal, we can execute the following code:
-
-``` r
+```{r, eval=TRUE}
 G=c(0,1,-1,0)
 b=0
 wald.res.2=raft.wald(est.raft.res=raft.res, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, 
           var.type = "martingale", Gamma = G, b = b, omega=wald.res$omega)
 wald.res.2$test
-#>          [,1]
-#> [1,] 2.177622
 wald.res.2$p.value
-#>           [,1]
-#> [1,] 0.1400307
 wald.res.2$df
-#> [1] 1
 ```
 ## Pseudo-Score Tests
 
@@ -304,27 +279,20 @@ $$ G= \begin{pmatrix} 1 & 0 & -1 & 0 \\
                       0 & 1 & -1 & 0 \end{pmatrix} $$
 and
 $$ b= \begin{pmatrix} 0 \\ 0 \end{pmatrix} $$
-
-``` r
+```{r, eval=TRUE}
 G=matrix( c(1,0,-1,0,0,1,-1,0), byrow=TRUE, nrow=2)
 b=c(0,0)
 raft.res.r=raft(beta = NULL,y=time, x=x, delta=delta, Gamma = G, b = b, tol = 10^-12,
      half.width = 0.5, n.iter.max = 100, A = NULL, a = NULL, m = NULL, n = NULL)
 raft.res.r$beta.r
-#> [1] -2.55727272 -2.55727272 -2.55727272 -0.03162338
 ```
 Note that the three regression coefficients for stage are all equal in this restricted estimator.
 
 We can now calculate the pseudo-score test statistic by calling raft.score.test:
-
-``` r
+```{r, eval=TRUE}
 raft.score.res=raft.score.test(raft.res.r)
 raft.score.res$test
-#>          [,1]
-#> [1,] 11.01726
 raft.score.res$p.value
-#>             [,1]
-#> [1,] 0.004051652
 ```
 Note that, unlike Wald-based inference that uses the unrestricted parameter estimates, a new restricted parameter estimate is needed every time the null hypothesis changes.
 
@@ -337,132 +305,66 @@ The implementation in RAFT of each of these weight functions has 3 arguments:  t
 ## Normally-Distributed Errors
 
 Normal scores corresponding to equations (\ref{eq:normal.wt}) are implemented in RAFT as:
-
-``` r
+```{r, eval=TRUE}
 A.norm=function(u,m,n) -(n+1)/n*dnorm( qnorm( (n*u+0.5)/(n+1), 0, 1), 0, 1)
 a.norm=function(u,m,n) qnorm( (n*u+0.5)/(n+1),0,1)
 ```
 The argument $n$ should be set equal to the sample size;  the argument $m$ is not needed in this case and can be kept at the default value $\texttt{NULL}$.  
 
 To estimate parameters using Normal weights, we would run
-
-``` r
+```{r, eval=TRUE}
 n.data = length(time)
 raft.res.Norm = raft(y=time, x=x, delta=delta, A=A.norm, a=a.norm, m=NULL, n=n.data)
 raft.res.Norm$beta
-#> [1] -0.43404791 -2.31443884 -4.43814628 -0.03092686
 raft.res$beta
-#> [1] -0.35948600 -2.46901688 -4.72136247 -0.03651029
 ```
 Note that the estimated parameters are similar for the unweighted and Normal weight analyses.
 
 Similarly, calling $\texttt{raft.wald}$ using $\texttt{raft.res.Norm}$ as input results in all aspects of inference being calculated assuming Normal weights. Although the estimated parameter values are similar with and without weights, $\Omega$ and test statistics may have larger differences:
-
-``` r
+```{r, eval=TRUE}
 wald.raft.Norm=raft.wald(est.raft.res=raft.res.Norm, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, var.type = "martingale", Gamma = G, b = b)
 wald.raft.Norm$test
-#>          [,1]
-#> [1,] 6.782369
 wald.raft.Norm$p.value
-#>            [,1]
-#> [1,] 0.03366878
 wald.raft.Norm$omega
-#>            [,1]       [,2]        [,3]       [,4]
-#> [1,] 129.206437 52.5523156  44.8744864 -1.4994573
-#> [2,]  52.552316 98.4125844  30.0231300 -0.6846325
-#> [3,]  44.874486 30.0231300 192.5041074  0.2823447
-#> [4,]  -1.499457 -0.6846325   0.2823447  0.1179206
 wald.raft.Norm$marginal.ci
-#>           lower       upper
-#> [1,] -2.7824308  1.91433500
-#> [2,] -4.3639588 -0.26491887
-#> [3,] -7.3046126 -1.57168000
-#> [4,] -0.1018719  0.04001813
 wald.res$test
-#>          [,1]
-#> [1,] 16.03942
 wald.res$p.value
-#>             [,1]
-#> [1,] 0.002966722
 wald.res$omega
-#>             [,1]        [,2]        [,3]       [,4]
-#> [1,] 160.6184432  57.2430884  53.4846073 -0.8988188
-#> [2,]  57.2430884 115.9459525  36.9240374 -0.3930864
-#> [3,]  53.4846073  36.9240374 167.5691063  0.5631962
-#> [4,]  -0.8988188  -0.3930864   0.5631962  0.1549105
 wald.res$marginal.ci
-#>           lower       upper
-#> [1,] -2.9778170  2.25884497
-#> [2,] -4.6936307 -0.24440305
-#> [3,] -7.3957468 -2.04697818
-#> [4,] -0.1178247  0.04480408
 ```
 
 
 ## Weibull Failure Times/Gumbel-Distributed Errors
 
 Weibull/Gumbel scores corresponding to equations (\ref{eq:weib.wt}) are implemented in RAFT as:
-
-``` r
+```{r, eval=TRUE}
 A.weib=function(u,m,n) (n+1)/n*( 1 - n*u/(n+1) )*log(1 - n*u/(n+1) )
 a.weib=function(u,m,n) -1 - log(1 - n*u/(n+1) )
 ```
 As with Normal errors, $n$ should be set equal to the sample size while $m$ is not specified.  
 
-
-``` r
+```{r, eval=TRUE}
 raft.res.Weib = raft(y=time, x=x, delta=delta, A=A.weib, a=a.weib, m=NULL, n=n.data)
 raft.res.Weib$beta
-#> [1] -0.60000000 -2.40000000 -5.63333333 -0.06666667
 ```
 Inference obtained using Weibull/Gumbel weights can now be obtained using $\texttt{raft.wald}$ as input to $\texttt{raft.wald}$:
-
-``` r
+```{r, eval=TRUE}
 wald.raft.Weib=raft.wald(est.raft.res=raft.res.Weib, half.width = 0.5, n.iter.max = 1000, tol = 10^-12, var.type = "martingale", Gamma = NULL, b = NULL, omega=NULL, alpha=0.05)
 wald.raft.Weib$test
-#>          [,1]
-#> [1,] 21.14414
 wald.raft.Weib$p.value
-#>              [,1]
-#> [1,] 0.0002964958
 wald.raft.Weib$omega
-#>             [,1]        [,2]        [,3]       [,4]
-#> [1,] 156.0955351  42.7824405  45.3198603  0.8546177
-#> [2,]  42.7824405 139.0477759  32.1399546 -0.3530101
-#> [3,]  45.3198603  32.1399546 190.5276897 -0.7362098
-#> [4,]   0.8546177  -0.3530101  -0.7362098  0.2418620
 wald.raft.Weib$marginal.ci
-#>           lower       upper
-#> [1,] -3.1812025  1.98120250
-#> [2,] -4.8361771  0.03617712
-#> [3,] -8.4850468 -2.78161986
-#> [4,] -0.1682706  0.03493730
 wald.res$test
-#>          [,1]
-#> [1,] 16.03942
 wald.res$p.value
-#>             [,1]
-#> [1,] 0.002966722
 wald.res$omega
-#>             [,1]        [,2]        [,3]       [,4]
-#> [1,] 160.6184432  57.2430884  53.4846073 -0.8988188
-#> [2,]  57.2430884 115.9459525  36.9240374 -0.3930864
-#> [3,]  53.4846073  36.9240374 167.5691063  0.5631962
-#> [4,]  -0.8988188  -0.3930864   0.5631962  0.1549105
 wald.res$marginal.ci
-#>           lower       upper
-#> [1,] -2.9778170  2.25884497
-#> [2,] -4.6936307 -0.24440305
-#> [3,] -7.3957468 -2.04697818
-#> [4,] -0.1178247  0.04480408
 ```
 
 
 ## Generalized F Weights
 
 The generalized F family is implemented in RAFT as
-
-``` r
+```{r, eval=TRUE}
 A.F=function(u,m,n) {
     F.inv=ifelse(u==1,0,qf(u,2*m,2*n))
     A=ifelse(u==1,0, -m^m*n^n*(F.inv)^m/(beta(m,n)*(n+m*F.inv)^(m+n)))
@@ -479,59 +381,28 @@ When using these transformations, $m$ should be set to $m_1$ and $n$ to $m_2$.
 ## Cauchy Errors
 
 Cauchy weights are implemented in RAFT by:
-
-``` r
+```{r, eval=TRUE}
 A.Cauchy=function(u,m,n) -(sin(pi*u))^2	 
 a.Cauchy=function(u,m,n) -(sin(2*pi*u))     
-```
+```	
 Note that a.Cauchy$(\cdot)$ is not monotone; this weight function cannot be used with standard R-estimation methods even for uncensored data.  Thus, even users with uncensored data who want to analyze their data assuming a Cauchy error may find it advantageous to use RAFT. 
 
 We can re-analyze the age-only model using the Cauchy weight function:
-
-``` r
+```{r, eval=TRUE}
 raft.res.CW=raft(y=time, x=x, delta=delta, A=A.Cauchy, a=a.Cauchy, m=NULL, n=NULL)
 raft.res.CW$beta
-#> [1] -1.3004164 -4.3161809 -5.8186793 -0.1165973
 raft.res$beta
-#> [1] -0.35948600 -2.46901688 -4.72136247 -0.03651029
 wald.res.CW=raft.wald(raft.res.CW)
 wald.res.CW$test
-#>          [,1]
-#> [1,] 83.34845
 wald.res.CW$p.value
-#>              [,1]
-#> [1,] 3.398445e-17
 wald.res.CW$omega
-#>            [,1]       [,2]       [,3]       [,4]
-#> [1,] 175.609097   4.920413 38.0451764  4.4802838
-#> [2,]   4.920413 303.832440 34.2418248 -2.7153460
-#> [3,]  38.045176  34.241825 43.0864265  0.6988976
-#> [4,]   4.480284  -2.715346  0.6988976  0.5572042
 wald.res.CW$marginal.ci
-#>           lower       upper
-#> [1,] -4.0382077  1.43737491
-#> [2,] -7.9173532 -0.71500851
-#> [3,] -7.1747960 -4.46256257
-#> [4,] -0.2708149  0.03762037
 wald.res$test
-#>          [,1]
-#> [1,] 16.03942
 wald.res$p.value
-#>             [,1]
-#> [1,] 0.002966722
 wald.res$omega
-#>             [,1]        [,2]        [,3]       [,4]
-#> [1,] 160.6184432  57.2430884  53.4846073 -0.8988188
-#> [2,]  57.2430884 115.9459525  36.9240374 -0.3930864
-#> [3,]  53.4846073  36.9240374 167.5691063  0.5631962
-#> [4,]  -0.8988188  -0.3930864   0.5631962  0.1549105
 wald.res$marginal.ci
-#>           lower       upper
-#> [1,] -2.9778170  2.25884497
-#> [2,] -4.6936307 -0.24440305
-#> [3,] -7.3957468 -2.04697818
-#> [4,] -0.1178247  0.04480408
-```
+
+```	
 Users who wish to write their own weight functions should note that $A(u,m,n)$ must be able to return a vector of values when the input $u$ is a vector.
 
 
