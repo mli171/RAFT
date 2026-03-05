@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Glen A Satten, Mo Li, Ni Zhao, Robert Strawderman" />
+
+<meta name="date" content="2026-02-20" />
+
+<title>A brief guide to RAFT</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  TeX: { equationNumbers: { autoNumber: "AMS" } }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+<style type="text/css">
+
+div.csl-bib-body { }
+div.csl-entry {
+clear: both;
+}
+.hanging div.csl-entry {
+margin-left:2em;
+text-indent:-2em;
+}
+div.csl-left-margin {
+min-width:2em;
+float:left;
+}
+div.csl-right-inline {
+margin-left:2em;
+padding-left:1em;
+}
+div.csl-indent {
+margin-left: 2em;
+}
+</style>
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">A brief guide to RAFT</h1>
+<h4 class="author">Glen A Satten, Mo Li, Ni Zhao, Robert
+Strawderman</h4>
+<h4 class="date">20 Feb 2026</h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#overview" id="toc-overview">Overview</a>
+<ul>
+<li><a href="#introduction" id="toc-introduction">Introduction</a>
+<ul>
+<li><a href="#rank-based-inference-in-the-linear-model-for-uncensored-data" id="toc-rank-based-inference-in-the-linear-model-for-uncensored-data">Rank-Based
+Inference in the Linear Model for Uncensored Data</a></li>
+<li><a href="#rank-based-inference-for-the-linear-model-with-censored-data" id="toc-rank-based-inference-for-the-linear-model-with-censored-data">Rank-Based
+Inference for the Linear Model with Censored Data</a></li>
+<li><a href="#weight-functions" id="toc-weight-functions">Weight
+Functions</a></li>
+</ul></li>
+<li><a href="#inference-with-raft" id="toc-inference-with-raft">Inference with RAFT</a>
+<ul>
+<li><a href="#pseudo-score-tests" id="toc-pseudo-score-tests">Pseudo-Score Tests</a></li>
+<li><a href="#wald-based-inference" id="toc-wald-based-inference">Wald-based Inference</a></li>
+</ul></li>
+</ul></li>
+<li><a href="#running-raft" id="toc-running-raft">Running RAFT</a>
+<ul>
+<li><a href="#installation" id="toc-installation">Installation</a></li>
+<li><a href="#open-the-vignette-in-r" id="toc-open-the-vignette-in-r">Open the Vignette in R</a></li>
+<li><a href="#load-example-data-cancer-of-the-larynx-data-from-klein-and-moeschberger" id="toc-load-example-data-cancer-of-the-larynx-data-from-klein-and-moeschberger">Load
+Example Data: Cancer of the Larynx Data from Klein and
+Moeschberger</a></li>
+<li><a href="#wald-type-inference-based-on-estimating-beta" id="toc-wald-type-inference-based-on-estimating-beta">Wald-Type
+Inference Based on Estimating <span class="math inline">\(\beta\)</span></a></li>
+<li><a href="#pseudo-score-tests-1" id="toc-pseudo-score-tests-1">Pseudo-Score Tests</a></li>
+</ul></li>
+<li><a href="#weighted-or-transformed-r-estimation" id="toc-weighted-or-transformed-r-estimation">Weighted (or Transformed)
+R-Estimation</a>
+<ul>
+<li><a href="#normally-distributed-errors-1" id="toc-normally-distributed-errors-1">Normally-Distributed
+Errors</a></li>
+<li><a href="#weibull-failure-timesgumbel-distributed-errors-1" id="toc-weibull-failure-timesgumbel-distributed-errors-1">Weibull
+Failure Times/Gumbel-Distributed Errors</a></li>
+<li><a href="#generalized-f-weights-1" id="toc-generalized-f-weights-1">Generalized F Weights</a></li>
+<li><a href="#cauchy-errors-1" id="toc-cauchy-errors-1">Cauchy
+Errors</a></li>
+</ul></li>
+<li><a href="#references" id="toc-references">References</a></li>
+</ul>
+</div>
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(RAFT)</span></code></pre></div>
+<div id="overview" class="section level1">
+<h1>Overview</h1>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>RAFT (<em>R</em>-estimation for the <em>A</em>ccelerated
+<em>F</em>ailure <em>T</em>ime model) is a software package that allows
+R-estimation (rank-based linear model) for the AFT with right-censored
+data. For additional details on the method, consult <span class="citation">Satten et al. (2026)</span>.</p>
+<p>RAFT can be used to estimate parameters, estimate the
+variance-covariance matrix of these parameters, and conduct pseudo-score
+tests for composite null hypotheses. The underlying model is <span class="math display">\[\begin{equation}
+y^*_i=  x_i^T  \beta + \epsilon_i
+\label{eq:basic.model}
+\end{equation}\]</span></p>
+<p>where <span class="math inline">\(x_i\)</span> has length <span class="math inline">\(P\)</span>. Let <span class="math inline">\(X\)</span> be the <span class="math inline">\(N
+\times P\)</span> matrix having <span class="math inline">\(i^\text{th}\)</span> row <span class="math inline">\(x_i^T\)</span>. Note that because inference is
+rank-based, <span class="math inline">\(X\)</span>s must <em>not</em>
+have a component corresponding to an intercept (i.e., for which all
+entries are the same). We also assume that <span class="math inline">\(X\)</span> has full column rank, i.e. the
+variables are not linearly dependent.</p>
+<p>When data are censored, values of <span class="math inline">\(y^*_i\)</span> are missing for some observations,
+but are known to be larger than an observed censoring time <span class="math inline">\(c_i\)</span>. We let <span class="math inline">\(\delta_i=I(y^*_i \ge c_i)\)</span> and let <span class="math inline">\(y_i=\text{min}(y^*_i,c_i)\)</span>. The observed
+data are then the values of <span class="math inline">\(y_i\)</span>,
+<span class="math inline">\(\delta_i\)</span> and <span class="math inline">\(x_i\)</span>. If data are measured on the scale of
+<span class="math inline">\(y\)</span> then (<span class="math inline">\(\ref{eq:basic.model}\)</span>) describes a
+censored linear regression. If <span class="math inline">\(y\)</span>
+represents the log of a failure time <span class="math inline">\(t\)</span>, then (<span class="math inline">\(\ref{eq:basic.model}\)</span>) is called the
+Accelerated Failure Time model.</p>
+<div id="rank-based-inference-in-the-linear-model-for-uncensored-data" class="section level3">
+<h3>Rank-Based Inference in the Linear Model for Uncensored Data</h3>
+<p>The standard (unweighted) R-estimator for linear regression with
+uncensored data solves the equations <span class="math display">\[\begin{equation}\label{eq:unweighted.r}
+\Psi(\beta)=\sum_{i=1}^N R_i(x_i - \overline{x})=0
+\end{equation}\]</span> where <span class="math inline">\(R_i\)</span>
+is the rank of the <span class="math inline">\(i^\text{th}\)</span>
+residual <span class="math inline">\(r_i:=y_i-x_{i} \beta\)</span> and
+<span class="math inline">\(\overline{x}\)</span> is the column mean of
+<span class="math inline">\(X\)</span>.</p>
+<p>More generally, weighted R-estimators for uncensored data solve the
+equations <span class="math display">\[\begin{equation}\label{eq:weighted.r.est}
+\Psi_a(\beta)=\sum_{i=1}^N a(R_i)(x_i - \overline{x})=0
+\end{equation}\]</span> for some weight function <span class="math inline">\(a(\cdot)\)</span>. Weight functions are discussed
+in the section `Weight Functions’ below.</p>
+<p><span class="math inline">\(\textbf{Comment}\)</span>: Ranks scale
+from 1:N but in this document we scale the ranks by N so they lie
+between 0 and 1.</p>
+</div>
+<div id="rank-based-inference-for-the-linear-model-with-censored-data" class="section level3">
+<h3>Rank-Based Inference for the Linear Model with Censored Data</h3>
+<p>When some observations are censored, ranks are not known for any of
+the observations. RAFT replaces the unknown ranks by their expected
+values calculated using a non-parameteric estimator. Heuristically, the
+rank of an observation is (<span class="math inline">\(N\)</span> times)
+the proportion of observations less than or equal to it. This suggest
+that when some data is censored, the rank of an uncensored observation
+should be proportional to the estimated cumulative distribution
+function. Thus, for uncensored observations, RAFT estimates the rank
+<span class="math inline">\(R_i\)</span> by <span class="math display">\[\begin{equation}\label{r.hat.uncens}
+\widetilde{R}_i=\frac{\widehat{F}(r_i)+\widehat{F}(r_i-)}{2}:=F^*(r_i)
+\end{equation}\]</span> where <span class="math inline">\(\widehat{F}(r)\)</span> is the self-consistent
+estimator <span class="citation">(Strawderman and Baer 2023)</span> of
+the CDF of the residuals <span class="math inline">\(r_i\)</span>.</p>
+<p>For censored observations, RAFT replaces <span class="math inline">\(F^*(r_i)\)</span> by its expected value
+conditional on having residual larger than <span class="math inline">\(r_i\)</span>, given by <span class="math display">\[\begin{equation}\label{r.cens}
+\widetilde{R}_i=\int_{r_i}^\infty F^*(r)\frac{
+d\widehat{F}(r)}{\widehat{S}(r_i)}=\frac{1}{2}[1+\widehat{F}(r_i)]
+\end{equation}\]</span> and then solves the score equations <span class="math display">\[\begin{equation}\label{eq:score.r}
+\widetilde{\Psi}(\beta)=\sum_{i=1}^N \widetilde{R}_i
+(x_i-\overline{x})=0
+\end{equation}\]</span></p>
+<p>The situation for weighted inference is similar. For uncensored
+observations, RAFT replaces <span class="math inline">\(a(R_i)\)</span>
+by <span class="math display">\[\begin{equation}\label{eq:r.tilde.a.uncens}
+a(F^*_a(r_i))=\frac{A(\widehat{F}(r_i))-A(\widehat{F}(r_i-))}{\widehat{F}(r_i)-\widehat{F}(r_i-)}
+\end{equation}\]</span> which implicitly defines <span class="math inline">\(F^*_a(r)\)</span> satisfying <span class="math inline">\(\widehat{F}(r_i-) \le F_a^*(r_i) \le
+\widehat{F}(r_i)\)</span>. For censored observations, RAFT replaces
+<span class="math inline">\(a(F^*_a(r))\)</span> by its expected value
+conditional on having residual larger than <span class="math inline">\(r_i\)</span>, given by <span class="math display">\[\begin{equation}\label{eq:r.tilde.a.cens}
+\int_{r_i}^\infty a(F^*_a(r_i)) \frac{
+d\widehat{F}(r)}{\widehat{S}(r_i)}=\frac{A(1)-A(\widehat{F}(r_i))}{\widehat{S}(r_i)}
+\end{equation}\]</span> where <span class="math display">\[A(u)=\int_0^u
+a(p)dp\]</span> Then, RAFT solves the score equations <span class="math display">\[\begin{equation}\label{eq:score.a}
+\widetilde{\Psi}_a=\sum_{i=1}^N \widetilde{R}^{(a)}_i
+(x_i-\overline{x})=0
+\end{equation}\]</span> where <span class="math inline">\(\widetilde{R}^{(a)}_i\)</span> is given by the
+right-hand side of equation (<span class="math inline">\(\ref{eq:r.tilde.a.uncens}\)</span>) when <span class="math inline">\(\delta_i=1\)</span> or the right-hand side of
+equation (<span class="math inline">\(\ref{eq:r.tilde.a.cens}\)</span>)
+when <span class="math inline">\(\delta_i=0\)</span>.</p>
+</div>
+<div id="weight-functions" class="section level3">
+<h3>Weight Functions</h3>
+<p>If the distribution of <span class="math inline">\(\epsilon_i\)</span> in <span class="math inline">\(\ref{eq:basic.model}\)</span> is known to have PDF
+<span class="math inline">\(g(\cdot)\)</span> and CDF <span class="math inline">\(G(\cdot)\)</span>, then the optimal choice for
+<span class="math inline">\(a(\cdot)\)</span> is <span class="math display">\[\begin{equation}\label{eq:optimal.a}
+a(u)=-\frac{g&#39;(G^{-1}(u))}{g(G^{-1}(u))}
+\end{equation}\]</span> with corresponding value for <span class="math inline">\(A(u)\)</span> given by <span class="math display">\[A(u)=g(G^{-1}(0))-g(G^{-1}(u))\]</span> RAFT
+currently includes four choices for <span class="math inline">\(a\)</span> corresponding to optimal
+transformations for the Normal, Weibull/Gumbel, Generalized <span class="math inline">\(F\)</span>, and Cauchy distributions.
+Alternatively, users can easily include their own functions.</p>
+<div id="normally-distributed-errors" class="section level4">
+<h4>Normally-Distributed Errors</h4>
+<p>For regression with Normally-distributed errors, the optimal choice
+is to use: <span class="math display">\[\begin{align}\label{eq:normal.wt}
+   a(u) &amp;=\Phi^{-1}\left( \frac{n*u+0.5}{n+1} \right) \\
+   A(u) &amp;= -\frac{n+1}{n} \phi\left( \frac{n*u+0.5}{n+1} \right)
+\end{align}\]</span> where <span class="math inline">\(\Phi\)</span> and
+<span class="math inline">\(\phi\)</span> are the CDF and PDF of the
+standard Normal distribution, respectively, and where we have shifted
+the argument <span class="math inline">\(u\)</span> to ensure <span class="math inline">\(a(u,m,n) &lt; \infty\)</span> when <span class="math inline">\(u=0\)</span> or <span class="math inline">\(u=1\)</span>.</p>
+</div>
+<div id="weibull-failure-timesgumbel-distributed-errors" class="section level4">
+<h4>Weibull Failure Times/Gumbel-Distributed Errors</h4>
+<p>For data where <span class="math inline">\(y=log(t)\)</span> and
+<span class="math inline">\(t\)</span> follows a Weibull distribution
+(so that <span class="math inline">\(y\)</span> follows a Gumbel
+distribution), the optimal choice is <span class="math display">\[\begin{align}\label{eq:weib.wt}
+   a(u) &amp;=-1 - \text{log}\left( 1-\frac{n*u}{n+1} \right) \\
+   A(u) &amp;= \frac{n+1}{n}  \left(1- \frac{n*u}{n+1} \right)
+\text{log} \left(1- \frac{n*u}{n+1} \right)
+\end{align}\]</span> where we have shifted the argument <span class="math inline">\(u\)</span> to ensure <span class="math inline">\(a(u,m,n) &lt; \infty\)</span> when <span class="math inline">\(u=1\)</span>.</p>
+</div>
+<div id="generalized-f-weights" class="section level4">
+<h4>Generalized F Weights</h4>
+<p>A flexible family of transformations that is useful when the
+distribution is not known but some shape information can be inferred
+assumes that <span class="math inline">\(G\)</span> corresponds to the
+CDF of the log of a <span class="math inline">\(F_{2m_1,2m_2}(\cdot)\)</span> variate. This choice
+corresponds to <span class="math display">\[\begin{align}\label{eq:f.wt}
+  a(u) &amp;= \frac{m_1 m_2(F^{-1}_{2m_1,2m_2}(u)-1)}{m_2 + m_1
+F^{-1}_{2m_1,2m_2}(u)} \\\\
+  A(u) &amp;= - \frac{m^{m_1}_1 m^{m_2}_2}{B(m_1,m_2)}
+\frac{[F^{-1}_{2m_1,2m_2}(u)]^{m_1}}{[m_2+m_1F^{-1}_{2m_1,2m_2}(u)]^{m_1+m_2}}
+\end{align}\]</span></p>
+</div>
+<div id="cauchy-errors" class="section level4">
+<h4>Cauchy Errors</h4>
+<p>The transformations that correspond to a Cauchy error distribution
+with location parameter 0 are given by <span class="math display">\[\begin{align}\label{eq:cauchy.wt}
+a(u) &amp;= - \text{sin}^2 (\pi*u)  \\\\
+A(u) &amp;= - \text{sin}(2 \pi u)
+\end{align}\]</span> Note that <span class="math inline">\(a(u)\)</span>
+is not monotone; this weight function cannot be used with standard
+R-estimation methods even for uncensored data. Thus, even users with
+uncensored data who want to analyze their data assuming a Cauchy error
+may find it advantageous to use RAFT.</p>
+</div>
+</div>
+</div>
+<div id="inference-with-raft" class="section level2">
+<h2>Inference with RAFT</h2>
+<p>RAFT is designed to estimate the parameters <span class="math inline">\(\beta\)</span> and perform inference. In
+particular, it can test hypotheses of the form <span class="math display">\[\begin{equation}\label{eq:H0}
+H_0 : \Gamma \cdot \beta = b
+\end{equation}\]</span> where <span class="math inline">\(\Gamma\)</span> is a <span class="math inline">\(P
+\times K\)</span> matrix with <span class="math inline">\(P \le
+K\)</span> and <span class="math inline">\(b\)</span> is a vector of
+length <span class="math inline">\(P\)</span>. We assume without loss of
+generality that <span class="math inline">\(\Gamma\)</span> has full row
+rank, so that <span class="math inline">\(P\)</span> is the number of
+degrees of freedom of the null hypothesis. If <span class="math inline">\(P=K\)</span> then the null is simple; otherwise,
+the null hypothesis is composite.</p>
+<p>RAFT can conduct inference either by estimating the parameters <span class="math inline">\(\beta\)</span> and their asymptotic
+variance-covariance matrix <span class="math inline">\(\Omega\)</span>,
+or by constructing a pseudo-score test for the hypothesis (<span class="math inline">\(\ref{eq:H0}\)</span>). Note that although both
+Wald and pseudo-score tests are available, the pseudo-score tests are
+much more computationally efficient.</p>
+<p>There are three main functions in the RAFT package: raft, score.test
+and raft.wald. The function raft is for parameter estimation. The
+function raft.score.test performs a pseudo-score test using the output
+from raft, and the function raft.wald uses the output from raft to
+return the variance-covariance matrix of parameter estimates, as well as
+a Wald test of the hypothesis (<span class="math inline">\(\ref{eq:H0}\)</span>).</p>
+<div id="pseudo-score-tests" class="section level3">
+<h3>Pseudo-Score Tests</h3>
+<p>For pseudo-score tests, RAFT estimates the restricted estimators by
+solving the restricted estimating equations <span class="math display">\[\begin{equation}
+\Lambda \widetilde{\Psi}(\Gamma^{-}b+\Lambda^{-}\lambda)=0
+\end{equation}\]</span> where <span class="math inline">\(\Lambda\)</span> is a <span class="math inline">\((K-P) \times K\)</span> matrix that satisfies
+<span class="math inline">\(\Gamma \Lambda^T=0\)</span> (i.e., has rows
+that are orthogonal to the rows of <span class="math inline">\(\Gamma\)</span>), <span class="math inline">\(\mathcal{M}^-\)</span> is the Moore-Penrose
+generalized inverse of matrix <span class="math inline">\(\mathcal{M}\)</span> and <span class="math inline">\(\lambda\)</span> is a <span class="math inline">\(K-P\)</span>-dimensional vector of parameters to
+be estimated. The restricted parameter estimates are then given by <span class="math inline">\(\widehat{\beta}_r=\Gamma^{-}b+\Lambda^{-}\widehat{\lambda}\)</span>.
+For additional details, see <span class="citation">Satten et al.
+(2025)</span>.</p>
+</div>
+<div id="wald-based-inference" class="section level3">
+<h3>Wald-based Inference</h3>
+<p>Wald-based inference is conceptually easier but computationally more
+difficult. <span class="citation">Satten et al. (2026)</span> show that
+<span class="math display">\[\begin{equation}\label{eq:asy.normal}
+\sqrt{N}(\widehat{\beta}-\beta) \sim N(0,\Omega)
+\end{equation}\]</span> but estimating <span class="math inline">\(\Omega\)</span> requires solving equations like
+(<span class="math inline">\(\ref{eq:score.r}\)</span>) or (<span class="math inline">\(\ref{eq:score.a}\)</span>) <span class="math inline">\(2P\)</span> times. However, once estimator <span class="math inline">\(\widehat{\Omega}\)</span> is available, tests of
+hypothesis (<span class="math inline">\(\ref{eq:H0}\)</span>) can be
+carried out by comparing the value of <span class="math display">\[\begin{equation}\label{eq:wald.test}
+N(\Gamma \widehat{\beta} - b)^T\widehat{\Omega}^{-1}(\Gamma
+\widehat{\beta} - b)
+\end{equation}\]</span> to the quantiles of the <span class="math inline">\(\chi^2_P\)</span> distribution. Similarly,
+asymptotic two-sided <span class="math inline">\(100(1-\alpha)\%\)</span> confidence intervals can
+be constructed using <span class="math display">\[\begin{equation}\label{eq:marginal.ci}
+\widehat{\beta}_j \pm z_\alpha \frac{\widehat{\Omega}_{jj}}{\sqrt{N}}
+\end{equation}\]</span> where <span class="math inline">\(z_\alpha\)</span> is the <span class="math inline">\(100( 1-\alpha/2 ) \%\)</span> quantile of the
+standard Normal distribution. The estimator of <span class="math inline">\(\Omega\)</span> used in RAFT is a small
+modification of that proposed by <span class="citation">Huang
+(2002)</span>.</p>
+</div>
+</div>
+</div>
+<div id="running-raft" class="section level1">
+<h1>Running RAFT</h1>
+<div id="installation" class="section level2">
+<h2>Installation</h2>
+<p>Install from the local file (the .tar.gz file), which you can
+download from <a href="https://github.com/mli171/RAFT" class="uri">https://github.com/mli171/RAFT</a>.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>devtools<span class="sc">::</span><span class="fu">install_local</span>(<span class="st">&quot;RAFT_1.0.tar.gz&quot;</span>, <span class="at">dependencies =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>You can also install the developer version from github via the
+following code.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>remotes<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">&quot;mli171/RAFT&quot;</span>, <span class="at">build_vignettes =</span> <span class="cn">TRUE</span>, <span class="at">dependencies =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+</div>
+<div id="open-the-vignette-in-r" class="section level2">
+<h2>Open the Vignette in R</h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">browseVignettes</span>(<span class="st">&quot;RAFT&quot;</span>)</span></code></pre></div>
+<p>or</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">vignette</span>(<span class="st">&quot;vignette&quot;</span>, <span class="at">package =</span> <span class="st">&quot;RAFT&quot;</span>)</span></code></pre></div>
+</div>
+<div id="load-example-data-cancer-of-the-larynx-data-from-klein-and-moeschberger" class="section level2">
+<h2>Load Example Data: Cancer of the Larynx Data from Klein and
+Moeschberger</h2>
+<p>To illustrate use of RAFT, we use data on 90 persons having cancer of
+the larynx. These data are described in Section 1.8 of Survival Analysis
+Techniques for Censored and Truncated data, and are available in the R
+package KMsurv.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>   <span class="fu">library</span>(<span class="st">&#39;KMsurv&#39;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>   <span class="fu">data</span>(larynx, <span class="at">package=</span><span class="st">&#39;KMsurv&#39;</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>   time<span class="ot">=</span>larynx<span class="sc">$</span>time</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>   stage<span class="ot">=</span><span class="fu">factor</span>(larynx<span class="sc">$</span>stage)</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>   age<span class="ot">=</span>larynx<span class="sc">$</span>age</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>   delta<span class="ot">=</span>larynx<span class="sc">$</span>delta</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>   x<span class="ot">=</span><span class="fu">model.matrix</span>(<span class="sc">~</span>stage<span class="sc">+</span>age<span class="sc">+</span><span class="dv">0</span>)[,<span class="dv">2</span><span class="sc">:</span><span class="dv">5</span>]</span></code></pre></div>
+<p>Note that we drop the first column of the model.matrix so that <span class="math inline">\(x\)</span> has full column rank.</p>
+</div>
+<div id="wald-type-inference-based-on-estimating-beta" class="section level2">
+<h2>Wald-Type Inference Based on Estimating <span class="math inline">\(\beta\)</span></h2>
+<p>We first describe how to conduct inference using Wald tests and
+confidence intervals. For Wald tests, we first perform
+<em>unrestricted</em> parameter estimation:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>raft.res<span class="ot">=</span><span class="fu">raft</span>(<span class="at">beta =</span> <span class="cn">NULL</span>, <span class="at">y=</span>time, <span class="at">x=</span>x, <span class="at">delta=</span>delta, <span class="at">Gamma =</span> <span class="cn">NULL</span>, <span class="at">b =</span> <span class="cn">NULL</span>, <span class="at">tol =</span> <span class="dv">10</span><span class="sc">^-</span><span class="dv">12</span>,</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>     <span class="at">half.width =</span> <span class="fl">0.5</span>, <span class="at">n.iter.max =</span> <span class="dv">100</span>, <span class="at">A =</span> <span class="cn">NULL</span>, <span class="at">a =</span> <span class="cn">NULL</span>, <span class="at">m =</span> <span class="cn">NULL</span>, <span class="at">n =</span> <span class="cn">NULL</span>)</span></code></pre></div>
+<p>Note that for unrestricted parameter estimation, we keep Gamma at its
+default value (Gamma=NULL) even if there is a hypothesis of the form
+<span class="math inline">\(\Gamma \cdot \beta = b\)</span> that we wish
+to test. Wald-based inference uses the <em>unrestricted</em>
+estimates.</p>
+<p>If desired, we can specify a starting value for the iterative
+solution of the score equations by setting <span class="math inline">\(\beta=\beta_0\)</span>. For example, we may wish
+to use a starting value <span class="math inline">\(\beta_0\)</span>
+obtained from the Fygenson &amp; Ritov approach.</p>
+<p>The value <span class="math inline">\(\texttt{raft.res\$beta}\)</span> has the parameter
+estimate(s).</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>raft.res<span class="sc">$</span>beta</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="co">#&gt; [1] -0.35948600 -2.46901688 -4.72136247 -0.03651029</span></span></code></pre></div>
+<p>To obtain its variance-covariance estimator we run the function <span class="math inline">\(\mathtt{raft.wald}\)</span> using <span class="math inline">\(\mathtt{raft.res}\)</span> as input. If desired,
+values for the matrix Gamma and vector b can now be specified in the
+call to raft.wald; otherwise, leaving Gamma and b as NULL is equivalent
+to choosing Gamma=diag(K) and b=rep(0,K). For example, the following
+code will estimate <span class="math inline">\(\Omega\)</span> and test
+the null hypothesis that all parameters are 0 using the test statistic
+in equation (<span class="math inline">\(\ref{eq:wald.test}\)</span>):</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>wald.res<span class="ot">=</span><span class="fu">raft.wald</span>(<span class="at">est.raft.res=</span>raft.res, <span class="at">half.width =</span> <span class="fl">0.5</span>, <span class="at">n.iter.max =</span> <span class="dv">1000</span>, <span class="at">tol =</span> <span class="dv">10</span><span class="sc">^-</span><span class="dv">12</span>, </span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>          <span class="at">var.type =</span> <span class="st">&quot;martingale&quot;</span>, <span class="at">Gamma =</span> <span class="cn">NULL</span>, <span class="at">b =</span> <span class="cn">NULL</span>, <span class="at">alpha=</span><span class="fl">0.05</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>wald.res<span class="sc">$</span>test</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt;          [,1]</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; [1,] 16.03942</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>wald.res<span class="sc">$</span>p.value</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co">#&gt;             [,1]</span></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co">#&gt; [1,] 0.002966722</span></span></code></pre></div>
+<p><span class="math inline">\(100(1-\alpha/2)\%\)</span> marginal
+confidence intervals for the parameters calculated using equation (<span class="math inline">\(\ref{eq:marginal.ci}\)</span>) are returned in</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>wald.res<span class="sc">$</span>marginal.ci</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="co">#&gt;           lower       upper</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">#&gt; [1,] -2.9778170  2.25884497</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt; [2,] -4.6936307 -0.24440305</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="co">#&gt; [3,] -7.3957468 -2.04697818</span></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="co">#&gt; [4,] -0.1178247  0.04480408</span></span></code></pre></div>
+<p>By default, <span class="math inline">\(\alpha=0.05\)</span> to
+produce 95% confidence intervals; change the parameter <span class="math inline">\(\alpha\)</span> in the call to <span class="math inline">\(\texttt{raft.wald}\)</span> for different
+significance values.</p>
+<p>The asymptotic variance-covariance matrix <span class="math inline">\(\Omega\)</span> of <span class="math inline">\(\sqrt{N}(\widetilde{\beta}-\beta)\)</span> is
+returned in</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>wald.res<span class="sc">$</span>omega</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="co">#&gt;             [,1]        [,2]        [,3]       [,4]</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co">#&gt; [1,] 160.6184432  57.2430884  53.4846073 -0.8988188</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt; [2,]  57.2430884 115.9459525  36.9240374 -0.3930864</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co">#&gt; [3,]  53.4846073  36.9240374 167.5691063  0.5631962</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="co">#&gt; [4,]  -0.8988188  -0.3930864   0.5631962  0.1549105</span></span></code></pre></div>
+<p>If we have more than one hypothesis we want to test, or want
+confidence intervals for multiple significance levels <span class="math inline">\(\alpha\)</span>, there is no need to
+re-calcaculate <span class="math inline">\(\Omega\)</span>. If we
+specify the argument <span class="math inline">\(\Omega\)</span> when
+running <span class="math inline">\(\texttt{raft.wald}\)</span>, then
+this value is used and <span class="math inline">\(\Omega\)</span> is
+not recalculated. For example, if we now want to test if the stage 3 and
+stage 4 effects are equal, we can execute the following code:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>G<span class="ot">=</span><span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">1</span>,<span class="sc">-</span><span class="dv">1</span>,<span class="dv">0</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>b<span class="ot">=</span><span class="dv">0</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>wald.res<span class="fl">.2</span><span class="ot">=</span><span class="fu">raft.wald</span>(<span class="at">est.raft.res=</span>raft.res, <span class="at">half.width =</span> <span class="fl">0.5</span>, <span class="at">n.iter.max =</span> <span class="dv">1000</span>, <span class="at">tol =</span> <span class="dv">10</span><span class="sc">^-</span><span class="dv">12</span>, </span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>          <span class="at">var.type =</span> <span class="st">&quot;martingale&quot;</span>, <span class="at">Gamma =</span> G, <span class="at">b =</span> b, <span class="at">omega=</span>wald.res<span class="sc">$</span>omega)</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>wald.res<span class="fl">.2</span><span class="sc">$</span>test</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a><span class="co">#&gt;          [,1]</span></span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="co">#&gt; [1,] 2.177622</span></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>wald.res<span class="fl">.2</span><span class="sc">$</span>p.value</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a><span class="co">#&gt;           [,1]</span></span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="co">#&gt; [1,] 0.1400307</span></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>wald.res<span class="fl">.2</span><span class="sc">$</span>df</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a><span class="co">#&gt; [1] 1</span></span></code></pre></div>
+</div>
+<div id="pseudo-score-tests-1" class="section level2">
+<h2>Pseudo-Score Tests</h2>
+<p>RAFT can also construct a pseudo-score test of the hypothesis <span class="math inline">\(\Gamma \beta = b\)</span>. In this case, we
+require the <em>restricted</em> parameter estimates. These can be
+obtained using the raft function, by specifying the values of Gamma and
+<span class="math inline">\(b\)</span>.</p>
+<p>As an example, we consider testing for any effect of stage. This
+corresponds to choosing <span class="math inline">\(\Gamma=G,
+b=b\)</span> where <span class="math display">\[ G= \begin{pmatrix} 1
+&amp; 0 &amp; -1 &amp; 0 \\
+                      0 &amp; 1 &amp; -1 &amp; 0 \end{pmatrix} \]</span>
+and <span class="math display">\[ b= \begin{pmatrix} 0 \\ 0
+\end{pmatrix} \]</span></p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>G<span class="ot">=</span><span class="fu">matrix</span>( <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">0</span>,<span class="sc">-</span><span class="dv">1</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">1</span>,<span class="sc">-</span><span class="dv">1</span>,<span class="dv">0</span>), <span class="at">byrow=</span><span class="cn">TRUE</span>, <span class="at">nrow=</span><span class="dv">2</span>)</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>b<span class="ot">=</span><span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">0</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>raft.res.r<span class="ot">=</span><span class="fu">raft</span>(<span class="at">beta =</span> <span class="cn">NULL</span>,<span class="at">y=</span>time, <span class="at">x=</span>x, <span class="at">delta=</span>delta, <span class="at">Gamma =</span> G, <span class="at">b =</span> b, <span class="at">tol =</span> <span class="dv">10</span><span class="sc">^-</span><span class="dv">12</span>,</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>     <span class="at">half.width =</span> <span class="fl">0.5</span>, <span class="at">n.iter.max =</span> <span class="dv">100</span>, <span class="at">A =</span> <span class="cn">NULL</span>, <span class="at">a =</span> <span class="cn">NULL</span>, <span class="at">m =</span> <span class="cn">NULL</span>, <span class="at">n =</span> <span class="cn">NULL</span>)</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>raft.res.r<span class="sc">$</span>beta.r</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a><span class="co">#&gt; [1] -2.55727272 -2.55727272 -2.55727272 -0.03162338</span></span></code></pre></div>
+<p>Note that the three regression coefficients for stage are all equal
+in this restricted estimator.</p>
+<p>We can now calculate the pseudo-score test statistic by calling
+raft.score.test:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>raft.score.res<span class="ot">=</span><span class="fu">raft.score.test</span>(raft.res.r)</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>raft.score.res<span class="sc">$</span>test</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="co">#&gt;          [,1]</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="co">#&gt; [1,] 11.01726</span></span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>raft.score.res<span class="sc">$</span>p.value</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="co">#&gt;             [,1]</span></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="co">#&gt; [1,] 0.004051652</span></span></code></pre></div>
+<p>Note that, unlike Wald-based inference that uses the unrestricted
+parameter estimates, a new restricted parameter estimate is needed every
+time the null hypothesis changes.</p>
+</div>
+</div>
+<div id="weighted-or-transformed-r-estimation" class="section level1">
+<h1>Weighted (or Transformed) R-Estimation</h1>
+<p>RAFT can also perform weighted R-estimation by specifying a
+transformation function <span class="math inline">\(a(\cdot)\)</span>
+and its anti-derivative <span class="math inline">\(A(\cdot)\)</span>.
+RAFT currently includes four weight functions: Normal, Weibull/Gumbel,
+Generalized F and Cauchy.</p>
+<p>The implementation in RAFT of each of these weight functions has 3
+arguments: the value of <span class="math inline">\(u\)</span> and two
+additional arguments (<span class="math inline">\(m\)</span> and <span class="math inline">\(n\)</span>) used to define the function.</p>
+<div id="normally-distributed-errors-1" class="section level2">
+<h2>Normally-Distributed Errors</h2>
+<p>Normal scores corresponding to equations (<span class="math inline">\(\ref{eq:normal.wt}\)</span>) are implemented in
+RAFT as:</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>A.norm<span class="ot">=</span><span class="cf">function</span>(u,m,n) <span class="sc">-</span>(n<span class="sc">+</span><span class="dv">1</span>)<span class="sc">/</span>n<span class="sc">*</span><span class="fu">dnorm</span>( <span class="fu">qnorm</span>( (n<span class="sc">*</span>u<span class="fl">+0.5</span>)<span class="sc">/</span>(n<span class="sc">+</span><span class="dv">1</span>), <span class="dv">0</span>, <span class="dv">1</span>), <span class="dv">0</span>, <span class="dv">1</span>)</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>a.norm<span class="ot">=</span><span class="cf">function</span>(u,m,n) <span class="fu">qnorm</span>( (n<span class="sc">*</span>u<span class="fl">+0.5</span>)<span class="sc">/</span>(n<span class="sc">+</span><span class="dv">1</span>),<span class="dv">0</span>,<span class="dv">1</span>)</span></code></pre></div>
+<p>The argument <span class="math inline">\(n\)</span> should be set
+equal to the sample size; the argument <span class="math inline">\(m\)</span> is not needed in this case and can be
+kept at the default value <span class="math inline">\(\texttt{NULL}\)</span>.</p>
+<p>To estimate parameters using Normal weights, we would run</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>n.data <span class="ot">=</span> <span class="fu">length</span>(time)</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>raft.res.Norm <span class="ot">=</span> <span class="fu">raft</span>(<span class="at">y=</span>time, <span class="at">x=</span>x, <span class="at">delta=</span>delta, <span class="at">A=</span>A.norm, <span class="at">a=</span>a.norm, <span class="at">m=</span><span class="cn">NULL</span>, <span class="at">n=</span>n.data)</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>raft.res.Norm<span class="sc">$</span>beta</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co">#&gt; [1] -0.43404791 -2.31443884 -4.43814628 -0.03092686</span></span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>raft.res<span class="sc">$</span>beta</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a><span class="co">#&gt; [1] -0.35948600 -2.46901688 -4.72136247 -0.03651029</span></span></code></pre></div>
+<p>Note that the estimated parameters are similar for the unweighted and
+Normal weight analyses.</p>
+<p>Similarly, calling <span class="math inline">\(\texttt{raft.wald}\)</span> using <span class="math inline">\(\texttt{raft.res.Norm}\)</span> as input results
+in all aspects of inference being calculated assuming Normal weights.
+Although the estimated parameter values are similar with and without
+weights, <span class="math inline">\(\Omega\)</span> and test statistics
+may have larger differences:</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a>wald.raft.Norm<span class="ot">=</span><span class="fu">raft.wald</span>(<span class="at">est.raft.res=</span>raft.res.Norm, <span class="at">half.width =</span> <span class="fl">0.5</span>, <span class="at">n.iter.max =</span> <span class="dv">1000</span>, <span class="at">tol =</span> <span class="dv">10</span><span class="sc">^-</span><span class="dv">12</span>, <span class="at">var.type =</span> <span class="st">&quot;martingale&quot;</span>, <span class="at">Gamma =</span> G, <span class="at">b =</span> b)</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>wald.raft.Norm<span class="sc">$</span>test</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="co">#&gt;          [,1]</span></span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a><span class="co">#&gt; [1,] 6.782369</span></span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>wald.raft.Norm<span class="sc">$</span>p.value</span>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a><span class="co">#&gt;            [,1]</span></span>
+<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a><span class="co">#&gt; [1,] 0.03366878</span></span>
+<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a>wald.raft.Norm<span class="sc">$</span>omega</span>
+<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a><span class="co">#&gt;            [,1]       [,2]        [,3]       [,4]</span></span>
+<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a><span class="co">#&gt; [1,] 129.206437 52.5523156  44.8744864 -1.4994573</span></span>
+<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a><span class="co">#&gt; [2,]  52.552316 98.4125844  30.0231300 -0.6846325</span></span>
+<span id="cb17-12"><a href="#cb17-12" tabindex="-1"></a><span class="co">#&gt; [3,]  44.874486 30.0231300 192.5041074  0.2823447</span></span>
+<span id="cb17-13"><a href="#cb17-13" tabindex="-1"></a><span class="co">#&gt; [4,]  -1.499457 -0.6846325   0.2823447  0.1179206</span></span>
+<span id="cb17-14"><a href="#cb17-14" tabindex="-1"></a>wald.raft.Norm<span class="sc">$</span>marginal.ci</span>
+<span id="cb17-15"><a href="#cb17-15" tabindex="-1"></a><span class="co">#&gt;           lower       upper</span></span>
+<span id="cb17-16"><a href="#cb17-16" tabindex="-1"></a><span class="co">#&gt; [1,] -2.7824308  1.91433500</span></span>
+<span id="cb17-17"><a href="#cb17-17" tabindex="-1"></a><span class="co">#&gt; [2,] -4.3639588 -0.26491887</span></span>
+<span id="cb17-18"><a href="#cb17-18" tabindex="-1"></a><span class="co">#&gt; [3,] -7.3046126 -1.57168000</span></span>
+<span id="cb17-19"><a href="#cb17-19" tabindex="-1"></a><span class="co">#&gt; [4,] -0.1018719  0.04001813</span></span>
+<span id="cb17-20"><a href="#cb17-20" tabindex="-1"></a>wald.res<span class="sc">$</span>test</span>
+<span id="cb17-21"><a href="#cb17-21" tabindex="-1"></a><span class="co">#&gt;          [,1]</span></span>
+<span id="cb17-22"><a href="#cb17-22" tabindex="-1"></a><span class="co">#&gt; [1,] 16.03942</span></span>
+<span id="cb17-23"><a href="#cb17-23" tabindex="-1"></a>wald.res<span class="sc">$</span>p.value</span>
+<span id="cb17-24"><a href="#cb17-24" tabindex="-1"></a><span class="co">#&gt;             [,1]</span></span>
+<span id="cb17-25"><a href="#cb17-25" tabindex="-1"></a><span class="co">#&gt; [1,] 0.002966722</span></span>
+<span id="cb17-26"><a href="#cb17-26" tabindex="-1"></a>wald.res<span class="sc">$</span>omega</span>
+<span id="cb17-27"><a href="#cb17-27" tabindex="-1"></a><span class="co">#&gt;             [,1]        [,2]        [,3]       [,4]</span></span>
+<span id="cb17-28"><a href="#cb17-28" tabindex="-1"></a><span class="co">#&gt; [1,] 160.6184432  57.2430884  53.4846073 -0.8988188</span></span>
+<span id="cb17-29"><a href="#cb17-29" tabindex="-1"></a><span class="co">#&gt; [2,]  57.2430884 115.9459525  36.9240374 -0.3930864</span></span>
+<span id="cb17-30"><a href="#cb17-30" tabindex="-1"></a><span class="co">#&gt; [3,]  53.4846073  36.9240374 167.5691063  0.5631962</span></span>
+<span id="cb17-31"><a href="#cb17-31" tabindex="-1"></a><span class="co">#&gt; [4,]  -0.8988188  -0.3930864   0.5631962  0.1549105</span></span>
+<span id="cb17-32"><a href="#cb17-32" tabindex="-1"></a>wald.res<span class="sc">$</span>marginal.ci</span>
+<span id="cb17-33"><a href="#cb17-33" tabindex="-1"></a><span class="co">#&gt;           lower       upper</span></span>
+<span id="cb17-34"><a href="#cb17-34" tabindex="-1"></a><span class="co">#&gt; [1,] -2.9778170  2.25884497</span></span>
+<span id="cb17-35"><a href="#cb17-35" tabindex="-1"></a><span class="co">#&gt; [2,] -4.6936307 -0.24440305</span></span>
+<span id="cb17-36"><a href="#cb17-36" tabindex="-1"></a><span class="co">#&gt; [3,] -7.3957468 -2.04697818</span></span>
+<span id="cb17-37"><a href="#cb17-37" tabindex="-1"></a><span class="co">#&gt; [4,] -0.1178247  0.04480408</span></span></code></pre></div>
+</div>
+<div id="weibull-failure-timesgumbel-distributed-errors-1" class="section level2">
+<h2>Weibull Failure Times/Gumbel-Distributed Errors</h2>
+<p>Weibull/Gumbel scores corresponding to equations (<span class="math inline">\(\ref{eq:weib.wt}\)</span>) are implemented in RAFT
+as:</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a>A.weib<span class="ot">=</span><span class="cf">function</span>(u,m,n) (n<span class="sc">+</span><span class="dv">1</span>)<span class="sc">/</span>n<span class="sc">*</span>( <span class="dv">1</span> <span class="sc">-</span> n<span class="sc">*</span>u<span class="sc">/</span>(n<span class="sc">+</span><span class="dv">1</span>) )<span class="sc">*</span><span class="fu">log</span>(<span class="dv">1</span> <span class="sc">-</span> n<span class="sc">*</span>u<span class="sc">/</span>(n<span class="sc">+</span><span class="dv">1</span>) )</span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>a.weib<span class="ot">=</span><span class="cf">function</span>(u,m,n) <span class="sc">-</span><span class="dv">1</span> <span class="sc">-</span> <span class="fu">log</span>(<span class="dv">1</span> <span class="sc">-</span> n<span class="sc">*</span>u<span class="sc">/</span>(n<span class="sc">+</span><span class="dv">1</span>) )</span></code></pre></div>
+<p>As with Normal errors, <span class="math inline">\(n\)</span> should
+be set equal to the sample size while <span class="math inline">\(m\)</span> is not specified.</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>raft.res.Weib <span class="ot">=</span> <span class="fu">raft</span>(<span class="at">y=</span>time, <span class="at">x=</span>x, <span class="at">delta=</span>delta, <span class="at">A=</span>A.weib, <span class="at">a=</span>a.weib, <span class="at">m=</span><span class="cn">NULL</span>, <span class="at">n=</span>n.data)</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>raft.res.Weib<span class="sc">$</span>beta</span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="co">#&gt; [1] -0.60000000 -2.40000000 -5.63333333 -0.06666667</span></span></code></pre></div>
+<p>Inference obtained using Weibull/Gumbel weights can now be obtained
+using <span class="math inline">\(\texttt{raft.wald}\)</span> as input
+to <span class="math inline">\(\texttt{raft.wald}\)</span>:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>wald.raft.Weib<span class="ot">=</span><span class="fu">raft.wald</span>(<span class="at">est.raft.res=</span>raft.res.Weib, <span class="at">half.width =</span> <span class="fl">0.5</span>, <span class="at">n.iter.max =</span> <span class="dv">1000</span>, <span class="at">tol =</span> <span class="dv">10</span><span class="sc">^-</span><span class="dv">12</span>, <span class="at">var.type =</span> <span class="st">&quot;martingale&quot;</span>, <span class="at">Gamma =</span> <span class="cn">NULL</span>, <span class="at">b =</span> <span class="cn">NULL</span>, <span class="at">omega=</span><span class="cn">NULL</span>, <span class="at">alpha=</span><span class="fl">0.05</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>wald.raft.Weib<span class="sc">$</span>test</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a><span class="co">#&gt;          [,1]</span></span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a><span class="co">#&gt; [1,] 21.14414</span></span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>wald.raft.Weib<span class="sc">$</span>p.value</span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a><span class="co">#&gt;              [,1]</span></span>
+<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a><span class="co">#&gt; [1,] 0.0002964958</span></span>
+<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a>wald.raft.Weib<span class="sc">$</span>omega</span>
+<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a><span class="co">#&gt;             [,1]        [,2]        [,3]       [,4]</span></span>
+<span id="cb20-10"><a href="#cb20-10" tabindex="-1"></a><span class="co">#&gt; [1,] 156.0955351  42.7824405  45.3198603  0.8546177</span></span>
+<span id="cb20-11"><a href="#cb20-11" tabindex="-1"></a><span class="co">#&gt; [2,]  42.7824405 139.0477759  32.1399546 -0.3530101</span></span>
+<span id="cb20-12"><a href="#cb20-12" tabindex="-1"></a><span class="co">#&gt; [3,]  45.3198603  32.1399546 190.5276897 -0.7362098</span></span>
+<span id="cb20-13"><a href="#cb20-13" tabindex="-1"></a><span class="co">#&gt; [4,]   0.8546177  -0.3530101  -0.7362098  0.2418620</span></span>
+<span id="cb20-14"><a href="#cb20-14" tabindex="-1"></a>wald.raft.Weib<span class="sc">$</span>marginal.ci</span>
+<span id="cb20-15"><a href="#cb20-15" tabindex="-1"></a><span class="co">#&gt;           lower       upper</span></span>
+<span id="cb20-16"><a href="#cb20-16" tabindex="-1"></a><span class="co">#&gt; [1,] -3.1812025  1.98120250</span></span>
+<span id="cb20-17"><a href="#cb20-17" tabindex="-1"></a><span class="co">#&gt; [2,] -4.8361771  0.03617712</span></span>
+<span id="cb20-18"><a href="#cb20-18" tabindex="-1"></a><span class="co">#&gt; [3,] -8.4850468 -2.78161986</span></span>
+<span id="cb20-19"><a href="#cb20-19" tabindex="-1"></a><span class="co">#&gt; [4,] -0.1682706  0.03493730</span></span>
+<span id="cb20-20"><a href="#cb20-20" tabindex="-1"></a>wald.res<span class="sc">$</span>test</span>
+<span id="cb20-21"><a href="#cb20-21" tabindex="-1"></a><span class="co">#&gt;          [,1]</span></span>
+<span id="cb20-22"><a href="#cb20-22" tabindex="-1"></a><span class="co">#&gt; [1,] 16.03942</span></span>
+<span id="cb20-23"><a href="#cb20-23" tabindex="-1"></a>wald.res<span class="sc">$</span>p.value</span>
+<span id="cb20-24"><a href="#cb20-24" tabindex="-1"></a><span class="co">#&gt;             [,1]</span></span>
+<span id="cb20-25"><a href="#cb20-25" tabindex="-1"></a><span class="co">#&gt; [1,] 0.002966722</span></span>
+<span id="cb20-26"><a href="#cb20-26" tabindex="-1"></a>wald.res<span class="sc">$</span>omega</span>
+<span id="cb20-27"><a href="#cb20-27" tabindex="-1"></a><span class="co">#&gt;             [,1]        [,2]        [,3]       [,4]</span></span>
+<span id="cb20-28"><a href="#cb20-28" tabindex="-1"></a><span class="co">#&gt; [1,] 160.6184432  57.2430884  53.4846073 -0.8988188</span></span>
+<span id="cb20-29"><a href="#cb20-29" tabindex="-1"></a><span class="co">#&gt; [2,]  57.2430884 115.9459525  36.9240374 -0.3930864</span></span>
+<span id="cb20-30"><a href="#cb20-30" tabindex="-1"></a><span class="co">#&gt; [3,]  53.4846073  36.9240374 167.5691063  0.5631962</span></span>
+<span id="cb20-31"><a href="#cb20-31" tabindex="-1"></a><span class="co">#&gt; [4,]  -0.8988188  -0.3930864   0.5631962  0.1549105</span></span>
+<span id="cb20-32"><a href="#cb20-32" tabindex="-1"></a>wald.res<span class="sc">$</span>marginal.ci</span>
+<span id="cb20-33"><a href="#cb20-33" tabindex="-1"></a><span class="co">#&gt;           lower       upper</span></span>
+<span id="cb20-34"><a href="#cb20-34" tabindex="-1"></a><span class="co">#&gt; [1,] -2.9778170  2.25884497</span></span>
+<span id="cb20-35"><a href="#cb20-35" tabindex="-1"></a><span class="co">#&gt; [2,] -4.6936307 -0.24440305</span></span>
+<span id="cb20-36"><a href="#cb20-36" tabindex="-1"></a><span class="co">#&gt; [3,] -7.3957468 -2.04697818</span></span>
+<span id="cb20-37"><a href="#cb20-37" tabindex="-1"></a><span class="co">#&gt; [4,] -0.1178247  0.04480408</span></span></code></pre></div>
+</div>
+<div id="generalized-f-weights-1" class="section level2">
+<h2>Generalized F Weights</h2>
+<p>The generalized F family is implemented in RAFT as</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>A.F<span class="ot">=</span><span class="cf">function</span>(u,m,n) {</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>    F.inv<span class="ot">=</span><span class="fu">ifelse</span>(u<span class="sc">==</span><span class="dv">1</span>,<span class="dv">0</span>,<span class="fu">qf</span>(u,<span class="dv">2</span><span class="sc">*</span>m,<span class="dv">2</span><span class="sc">*</span>n))</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>    A<span class="ot">=</span><span class="fu">ifelse</span>(u<span class="sc">==</span><span class="dv">1</span>,<span class="dv">0</span>, <span class="sc">-</span>m<span class="sc">^</span>m<span class="sc">*</span>n<span class="sc">^</span>n<span class="sc">*</span>(F.inv)<span class="sc">^</span>m<span class="sc">/</span>(<span class="fu">beta</span>(m,n)<span class="sc">*</span>(n<span class="sc">+</span>m<span class="sc">*</span>F.inv)<span class="sc">^</span>(m<span class="sc">+</span>n)))</span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>    <span class="fu">return</span>(A)</span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a>    }</span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>a.F<span class="ot">=</span><span class="cf">function</span>(u,m,n) {</span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>    F.inv<span class="ot">=</span><span class="fu">ifelse</span>(u<span class="sc">==</span><span class="dv">1</span>,<span class="dv">0</span>,<span class="fu">qf</span>(u,<span class="dv">2</span><span class="sc">*</span>m,<span class="dv">2</span><span class="sc">*</span>n))</span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a>    a<span class="ot">=</span><span class="fu">ifelse</span>(u<span class="sc">==</span><span class="dv">1</span>,n,m<span class="sc">*</span>n<span class="sc">*</span>(F.inv<span class="dv">-1</span>)<span class="sc">/</span>(n<span class="sc">+</span>m<span class="sc">*</span>F.inv))</span>
+<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a>    <span class="fu">return</span>(a)</span>
+<span id="cb21-10"><a href="#cb21-10" tabindex="-1"></a>    }   </span></code></pre></div>
+<p>When using these transformations, <span class="math inline">\(m\)</span> should be set to <span class="math inline">\(m_1\)</span> and <span class="math inline">\(n\)</span> to <span class="math inline">\(m_2\)</span>.</p>
+</div>
+<div id="cauchy-errors-1" class="section level2">
+<h2>Cauchy Errors</h2>
+<p>Cauchy weights are implemented in RAFT by:</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>A.Cauchy<span class="ot">=</span><span class="cf">function</span>(u,m,n) <span class="sc">-</span>(<span class="fu">sin</span>(pi<span class="sc">*</span>u))<span class="sc">^</span><span class="dv">2</span>  </span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>a.Cauchy<span class="ot">=</span><span class="cf">function</span>(u,m,n) <span class="sc">-</span>(<span class="fu">sin</span>(<span class="dv">2</span><span class="sc">*</span>pi<span class="sc">*</span>u))     </span></code></pre></div>
+<p>Note that a.Cauchy<span class="math inline">\((\cdot)\)</span> is not
+monotone; this weight function cannot be used with standard R-estimation
+methods even for uncensored data. Thus, even users with uncensored data
+who want to analyze their data assuming a Cauchy error may find it
+advantageous to use RAFT.</p>
+<p>We can re-analyze the age-only model using the Cauchy weight
+function:</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a>raft.res.CW<span class="ot">=</span><span class="fu">raft</span>(<span class="at">y=</span>time, <span class="at">x=</span>x, <span class="at">delta=</span>delta, <span class="at">A=</span>A.Cauchy, <span class="at">a=</span>a.Cauchy, <span class="at">m=</span><span class="cn">NULL</span>, <span class="at">n=</span><span class="cn">NULL</span>)</span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>raft.res.CW<span class="sc">$</span>beta</span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a><span class="co">#&gt; [1] -1.3004164 -4.3161809 -5.8186793 -0.1165973</span></span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a>raft.res<span class="sc">$</span>beta</span>
+<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a><span class="co">#&gt; [1] -0.35948600 -2.46901688 -4.72136247 -0.03651029</span></span>
+<span id="cb23-6"><a href="#cb23-6" tabindex="-1"></a>wald.res.CW<span class="ot">=</span><span class="fu">raft.wald</span>(raft.res.CW)</span>
+<span id="cb23-7"><a href="#cb23-7" tabindex="-1"></a>wald.res.CW<span class="sc">$</span>test</span>
+<span id="cb23-8"><a href="#cb23-8" tabindex="-1"></a><span class="co">#&gt;          [,1]</span></span>
+<span id="cb23-9"><a href="#cb23-9" tabindex="-1"></a><span class="co">#&gt; [1,] 83.34845</span></span>
+<span id="cb23-10"><a href="#cb23-10" tabindex="-1"></a>wald.res.CW<span class="sc">$</span>p.value</span>
+<span id="cb23-11"><a href="#cb23-11" tabindex="-1"></a><span class="co">#&gt;              [,1]</span></span>
+<span id="cb23-12"><a href="#cb23-12" tabindex="-1"></a><span class="co">#&gt; [1,] 3.398445e-17</span></span>
+<span id="cb23-13"><a href="#cb23-13" tabindex="-1"></a>wald.res.CW<span class="sc">$</span>omega</span>
+<span id="cb23-14"><a href="#cb23-14" tabindex="-1"></a><span class="co">#&gt;            [,1]       [,2]       [,3]       [,4]</span></span>
+<span id="cb23-15"><a href="#cb23-15" tabindex="-1"></a><span class="co">#&gt; [1,] 175.609097   4.920413 38.0451764  4.4802838</span></span>
+<span id="cb23-16"><a href="#cb23-16" tabindex="-1"></a><span class="co">#&gt; [2,]   4.920413 303.832440 34.2418248 -2.7153460</span></span>
+<span id="cb23-17"><a href="#cb23-17" tabindex="-1"></a><span class="co">#&gt; [3,]  38.045176  34.241825 43.0864265  0.6988976</span></span>
+<span id="cb23-18"><a href="#cb23-18" tabindex="-1"></a><span class="co">#&gt; [4,]   4.480284  -2.715346  0.6988976  0.5572042</span></span>
+<span id="cb23-19"><a href="#cb23-19" tabindex="-1"></a>wald.res.CW<span class="sc">$</span>marginal.ci</span>
+<span id="cb23-20"><a href="#cb23-20" tabindex="-1"></a><span class="co">#&gt;           lower       upper</span></span>
+<span id="cb23-21"><a href="#cb23-21" tabindex="-1"></a><span class="co">#&gt; [1,] -4.0382077  1.43737491</span></span>
+<span id="cb23-22"><a href="#cb23-22" tabindex="-1"></a><span class="co">#&gt; [2,] -7.9173532 -0.71500851</span></span>
+<span id="cb23-23"><a href="#cb23-23" tabindex="-1"></a><span class="co">#&gt; [3,] -7.1747960 -4.46256257</span></span>
+<span id="cb23-24"><a href="#cb23-24" tabindex="-1"></a><span class="co">#&gt; [4,] -0.2708149  0.03762037</span></span>
+<span id="cb23-25"><a href="#cb23-25" tabindex="-1"></a>wald.res<span class="sc">$</span>test</span>
+<span id="cb23-26"><a href="#cb23-26" tabindex="-1"></a><span class="co">#&gt;          [,1]</span></span>
+<span id="cb23-27"><a href="#cb23-27" tabindex="-1"></a><span class="co">#&gt; [1,] 16.03942</span></span>
+<span id="cb23-28"><a href="#cb23-28" tabindex="-1"></a>wald.res<span class="sc">$</span>p.value</span>
+<span id="cb23-29"><a href="#cb23-29" tabindex="-1"></a><span class="co">#&gt;             [,1]</span></span>
+<span id="cb23-30"><a href="#cb23-30" tabindex="-1"></a><span class="co">#&gt; [1,] 0.002966722</span></span>
+<span id="cb23-31"><a href="#cb23-31" tabindex="-1"></a>wald.res<span class="sc">$</span>omega</span>
+<span id="cb23-32"><a href="#cb23-32" tabindex="-1"></a><span class="co">#&gt;             [,1]        [,2]        [,3]       [,4]</span></span>
+<span id="cb23-33"><a href="#cb23-33" tabindex="-1"></a><span class="co">#&gt; [1,] 160.6184432  57.2430884  53.4846073 -0.8988188</span></span>
+<span id="cb23-34"><a href="#cb23-34" tabindex="-1"></a><span class="co">#&gt; [2,]  57.2430884 115.9459525  36.9240374 -0.3930864</span></span>
+<span id="cb23-35"><a href="#cb23-35" tabindex="-1"></a><span class="co">#&gt; [3,]  53.4846073  36.9240374 167.5691063  0.5631962</span></span>
+<span id="cb23-36"><a href="#cb23-36" tabindex="-1"></a><span class="co">#&gt; [4,]  -0.8988188  -0.3930864   0.5631962  0.1549105</span></span>
+<span id="cb23-37"><a href="#cb23-37" tabindex="-1"></a>wald.res<span class="sc">$</span>marginal.ci</span>
+<span id="cb23-38"><a href="#cb23-38" tabindex="-1"></a><span class="co">#&gt;           lower       upper</span></span>
+<span id="cb23-39"><a href="#cb23-39" tabindex="-1"></a><span class="co">#&gt; [1,] -2.9778170  2.25884497</span></span>
+<span id="cb23-40"><a href="#cb23-40" tabindex="-1"></a><span class="co">#&gt; [2,] -4.6936307 -0.24440305</span></span>
+<span id="cb23-41"><a href="#cb23-41" tabindex="-1"></a><span class="co">#&gt; [3,] -7.3957468 -2.04697818</span></span>
+<span id="cb23-42"><a href="#cb23-42" tabindex="-1"></a><span class="co">#&gt; [4,] -0.1178247  0.04480408</span></span></code></pre></div>
+<p>Users who wish to write their own weight functions should note that
+<span class="math inline">\(A(u,m,n)\)</span> must be able to return a
+vector of values when the input <span class="math inline">\(u\)</span>
+is a vector.</p>
+</div>
+</div>
+<div id="references" class="section level1 unnumbered">
+<h1 class="unnumbered">References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-Huang2002" class="csl-entry">
+Huang, Yijian. 2002. <span>“Calibration Regression of Censored Lifetime
+Medical Costs.”</span> <em>Journal of the American Statistical
+Association</em> 97:457: 318–27. <a href="https://doi.org/DOI:10.1198/016214502753479446">https://doi.org/DOI:10.1198/016214502753479446</a>.
+</div>
+<div id="ref-Satten2025" class="csl-entry">
+Satten, Glen A., Mo Li, and Ni Zhao. 2025. <span>“Rank-Based
+Compositional Analysis Using Log-Linear Models for Microbiome Data with
+Zero Cells.”</span> <em>BioArXiv</em>, ahead of print.
+https://doi.org/<a href="https://doi.org/10.1101/2025.11.26.690468">https://doi.org/10.1101/2025.11.26.690468</a>.
+</div>
+<div id="ref-Satten2026" class="csl-entry">
+Satten, Glen A., Mo Li, Ni Zhao, and Robert L. Strawderman. 2026.
+<span>“R-Estimation with Right-Censored Data.”</span> <em>ArXiv</em>,
+ahead of print. https://doi.org/<a href="https://doi.org/10.48550/arXiv.2601.06685">https://doi.org/10.48550/arXiv.2601.06685</a>.
+</div>
+<div id="ref-Strawderman2023" class="csl-entry">
+Strawderman, Robert L., and Benjamin R. Baer. 2023. <span>“On the Role
+of <span>V</span>olterra Integral Equations in Self-Consistent,
+Product-Limit, Inverse Probability of Censoring Weighted, and
+Redistribution-to-the-Right Estimators for the Survival
+Function.”</span> <em>Lifetime Data Analysis</em> 30: 649–66.
+</div>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
